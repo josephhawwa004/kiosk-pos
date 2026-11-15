@@ -120,6 +120,11 @@ async function loadAll() {
   await DB.open();
   let cat = await DB.get('catalog');
   if (!cat) { cat = seedCatalog(); await DB.set('catalog', cat); }
+  if ((cat.seedVersion || 1) < 2) { /* v2: raisin drink belongs with drinks */
+    const g = cat.groups.find((x) => x.id === 'raisins');
+    if (g) { g.cat = 'drinks'; g.ar = 'الرافدين زبيب العنب'; g.en = 'Al Rafidain Raisin Drink'; }
+    cat.seedVersion = 2; await DB.set('catalog', cat);
+  }
   S.cats = cat.cats; S.groups = cat.groups; S.items = cat.items;
   S.settings = (await DB.get('settings')) || {};
   if (!S.settings.pin) { S.settings.pin = await sha('1234'); S.settings.lang = 'ar'; await DB.set('settings', S.settings); }
