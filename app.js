@@ -1,0 +1,783 @@
+/* Cafeteria POS — works fully offline. Data lives in IndexedDB on this device. */
+'use strict';
+
+/* ---------- utils ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const toFils = (jd) => { const n = parseFloat(String(jd).replace(',', '.')); return isNaN(n) || n < 0 ? null : Math.round(n * 1000); };
+const jd = (fils) => (fils == null || isNaN(fils) ? '—' : (Math.round(fils) / 1000).toFixed(3));
+const pad = (n) => String(n).padStart(2, '0');
+const dayOf = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const timeOf = (ts) => { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+async function sha(s) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('pos:' + s)); return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join(''); }
+const ICON = {
+  cup: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M9 3v2M12 3v2"/></svg>',
+  lock: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  search: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5F6168" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+  x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  sync: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>',
+  cart: '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8F8B82" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/></svg>',
+  back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+};
+
+/* ---------- language ---------- */
+const T = {
+  ar: {
+    brand: 'كافتيريا الجامعة', pos: 'نقطة البيع', offline: 'بدون إنترنت · كل شي محفوظ', online: 'متصل · كل شي محفوظ',
+    sheetOk: 'الشيت محدّث', sheetPending: (n) => `${n} عملية بانتظار رفع الشيت`, sheetOff: 'الشيت مش مربوط',
+    all: 'الكل', items: (n) => `${n} صنف`, search: 'ابحث عن صنف...', results: 'نتائج البحث', noResults: 'ما في أصناف',
+    flavors: (n) => `${n} نكهات`, unavailable: 'غير متوفر', noPrice: 'بدون سعر', from: 'من', jd: 'د.أ',
+    order: 'الطلب الحالي', clear: 'مسح الكل', emptyCart: 'السلة فاضية', emptyHint: 'اكبس على أي صنف لتضيفه',
+    total: 'المجموع', cash: 'كاش', visa: 'فيزا', cliq: 'كليك', received: 'المبلغ المستلم من الزبون', exact: 'بالضبط',
+    change: 'الباقي للزبون', short: 'المبلغ ناقص', hosp: 'ضيافة', checkout: 'إتمام البيع', pickFlavor: 'اختار النكهة', soldOut: 'خلصت',
+    sold: (t, p) => `تم البيع · ${t} د.أ · ${p}`, hospDone: (t) => `تمت الضيافة · ${t} د.أ`, lessThan: 'المبلغ المستلم أقل من المجموع',
+    pinTitle: 'كلمة سر الـ Admin', pinHosp: 'مطلوبة للضيافة', pinAdmin: 'للدخول على الـ Admin', wrongPin: 'كلمة السر غلط', ok: 'تأكيد', cancel: 'إلغاء',
+    back: 'رجوع لشاشة البيع',
+    tItems: 'الأصناف والمخزون', tItemsSub: 'أسعار، كميات، ON / OFF', tEod: 'End of Day', tEodSub: 'المبيعات والربح',
+    tSales: 'سجل المبيعات', tSalesSub: 'كل الطلبات وإلغاؤها', tHosp: 'الضيافة', tHospSub: 'كل عمليات الضيافة',
+    tBarista: 'الباريستا', tBaristaSub: 'قريباً', tSettings: 'الإعدادات', tSettingsSub: 'الشيت، كلمة السر، النسخ الاحتياطي',
+  },
+  en: {
+    brand: 'University Cafeteria', pos: 'Point of sale', offline: 'Offline · everything saved', online: 'Online · everything saved',
+    sheetOk: 'Sheet up to date', sheetPending: (n) => `${n} waiting to upload`, sheetOff: 'Sheet not linked',
+    all: 'All', items: (n) => `${n} items`, search: 'Search items...', results: 'Search results', noResults: 'No items found',
+    flavors: (n) => `${n} flavours`, unavailable: 'Unavailable', noPrice: 'No price', from: 'from', jd: 'JD',
+    order: 'Current order', clear: 'Clear all', emptyCart: 'Cart is empty', emptyHint: 'Tap any item to add it',
+    total: 'Total', cash: 'Cash', visa: 'Visa', cliq: 'CliQ', received: 'Amount received', exact: 'Exact',
+    change: 'Change', short: 'Not enough', hosp: 'Hospitality', checkout: 'Complete sale', pickFlavor: 'Pick a flavour', soldOut: 'Sold out',
+    sold: (t, p) => `Sold · ${t} JD · ${p}`, hospDone: (t) => `Hospitality saved · ${t} JD`, lessThan: 'Received amount is less than the total',
+    pinTitle: 'Admin password', pinHosp: 'Required for hospitality', pinAdmin: 'To open Admin', wrongPin: 'Wrong password', ok: 'Confirm', cancel: 'Cancel',
+    back: 'Back to sales',
+    tItems: 'Items & stock', tItemsSub: 'Prices, stock, ON / OFF', tEod: 'End of Day', tEodSub: 'Sales and profit',
+    tSales: 'Sales log', tSalesSub: 'All orders, void', tHosp: 'Hospitality', tHospSub: 'All hospitality',
+    tBarista: 'Barista', tBaristaSub: 'Coming soon', tSettings: 'Settings', tSettingsSub: 'Sheet, password, backup',
+  },
+};
+const t = (k, ...a) => { const v = T[S.lang][k] ?? T.ar[k] ?? k; return typeof v === 'function' ? v(...a) : v; };
+const L = (ar, en) => (S.lang === 'en' && en ? en : ar);
+
+/* ---------- storage (IndexedDB) ---------- */
+const DB = {
+  db: null,
+  open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('cafeteria-pos', 1);
+      r.onupgradeneeded = () => {
+        const db = r.result;
+        db.createObjectStore('kv');
+        const s = db.createObjectStore('sales', { keyPath: 'id' });
+        s.createIndex('day', 'day');
+        s.createIndex('synced', 'syncedFlag');
+      };
+      r.onsuccess = () => { DB.db = r.result; res(); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  tx(stores, mode, fn) {
+    return new Promise((res, rej) => {
+      const tx = DB.db.transaction(stores, mode);
+      let out;
+      tx.oncomplete = () => res(out);
+      tx.onerror = () => rej(tx.error);
+      tx.onabort = () => rej(tx.error || new Error('aborted'));
+      out = fn(tx);
+    });
+  },
+  req(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  async get(key) { return DB.req(DB.db.transaction('kv').objectStore('kv').get(key)); },
+  set(key, val) { return DB.tx(['kv'], 'readwrite', (tx) => { tx.objectStore('kv').put(val, key); }); },
+  async salesRange(from, to) {
+    const idx = DB.db.transaction('sales').objectStore('sales').index('day');
+    return DB.req(idx.getAll(IDBKeyRange.bound(from, to)));
+  },
+  async unsynced() { return DB.req(DB.db.transaction('sales').objectStore('sales').index('synced').getAll(0)); },
+  async allSales() { return DB.req(DB.db.transaction('sales').objectStore('sales').getAll()); },
+};
+
+/* ---------- state ---------- */
+const S = {
+  lang: 'ar', view: 'sell', cat: 'all', q: '', cart: [], pay: 'cash', given: null,
+  cats: [], groups: [], items: {}, settings: {}, dayCount: 0, pending: 0,
+  admin: { tab: 'items', q: '', cat: 'all', from: dayOf(), to: dayOf() },
+};
+
+function seedCatalog() {
+  const groups = [], items = {};
+  SEED.groups.forEach((g, gi) => {
+    groups.push({ id: g.id, ar: g.ar, en: g.en, cat: g.cat, order: gi });
+    g.variants.forEach((v, vi) => {
+      items[v.id] = { id: v.id, groupId: g.id, ar: v.ar, en: v.en, img: v.img, box: Math.round(v.boxPrice * 1000), units: v.units, sell: null, stock: 0, off: false, sku: v.sku, order: vi };
+    });
+  });
+  return { cats: SEED.cats, groups, items, seedVersion: SEED.version };
+}
+
+async function loadAll() {
+  await DB.open();
+  let cat = await DB.get('catalog');
+  if (!cat) { cat = seedCatalog(); await DB.set('catalog', cat); }
+  S.cats = cat.cats; S.groups = cat.groups; S.items = cat.items;
+  S.settings = (await DB.get('settings')) || {};
+  if (!S.settings.pin) { S.settings.pin = await sha('1234'); S.settings.lang = 'ar'; await DB.set('settings', S.settings); }
+  S.lang = S.settings.lang || 'ar';
+  const today = await DB.salesRange(dayOf(), dayOf());
+  S.dayCount = today.length;
+  S.pending = (await DB.unsynced()).length;
+}
+const catalogDoc = () => ({ cats: S.cats, groups: S.groups, items: S.items, seedVersion: SEED.version });
+const saveCatalog = () => DB.set('catalog', catalogDoc());
+const saveSettings = () => DB.set('settings', S.settings);
+
+/* ---------- catalog helpers ---------- */
+const groupOf = (it) => S.groups.find((g) => g.id === it.groupId);
+const itemsOf = (gid) => Object.values(S.items).filter((i) => i.groupId === gid).sort((a, b) => a.order - b.order);
+const itemName = (it) => { const g = groupOf(it); const gn = g ? L(g.ar, g.en) : ''; const vn = L(it.ar, it.en); return vn ? `${gn} - ${vn}` : gn; };
+const unitCost = (it) => (it.units > 0 && it.box != null ? it.box / it.units : null);
+const isAvail = (it) => !it.off && it.stock > 0 && it.sell > 0;
+const lowLimit = (it) => (it.units > 0 ? Math.max(1, Math.ceil(it.units / 2)) : 5);
+function groupMatches(g, q) {
+  if (!q) return true;
+  const hay = [g.ar, g.en, ...itemsOf(g.id).flatMap((i) => [i.ar, i.en])].filter(Boolean).join(' ').toLowerCase();
+  return q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
+}
+
+/* ---------- render: shell ---------- */
+function render() {
+  document.documentElement.lang = S.lang;
+  document.documentElement.dir = S.lang === 'ar' ? 'rtl' : 'ltr';
+  const focus = rememberFocus();
+  $('#app').innerHTML = header() + (S.view === 'sell' ? sellView() : adminView());
+  restoreFocus(focus);
+}
+function rememberFocus() { const a = document.activeElement; return a && a.id ? { id: a.id, s: a.selectionStart, e: a.selectionEnd } : null; }
+function restoreFocus(f) { if (!f) return; const el = document.getElementById(f.id); if (!el) return; el.focus(); try { if (f.s != null) el.setSelectionRange(f.s, f.e); } catch (e) { /* number inputs */ } }
+
+function header() {
+  const on = navigator.onLine;
+  const sheet = !S.settings.sheetUrl ? t('sheetOff') : S.pending ? t('sheetPending', S.pending) : t('sheetOk');
+  return `<header class="top">
+    <div class="brand"><div class="logo">${ICON.cup}</div><div><b>${esc(t('brand'))}</b><small>${S.view === 'admin' ? 'Admin' : esc(t('pos'))}</small></div></div>
+    <div class="grow"></div>
+    <div class="pill"><span class="dot ${on ? 'on' : ''}"></span><span>${esc(on ? t('online') : t('offline'))}</span></div>
+    <button class="pill" data-act="syncNow" style="color:#D4D5DA">${ICON.sync}<span>${esc(sheet)}</span></button>
+    <button class="hbtn" data-act="lang">${S.lang === 'ar' ? 'EN' : 'ع'}</button>
+    ${S.view === 'sell'
+      ? `<button class="hbtn" data-act="openAdmin">${ICON.lock}<span>Admin</span></button>`
+      : `<button class="hbtn" data-act="closeAdmin">${ICON.back}<span>${esc(t('back'))}</span></button>`}
+  </header>`;
+}
+
+/* ---------- sell view ---------- */
+function visibleGroups() {
+  const q = S.q.trim();
+  return S.groups.filter((g) => (S.cat === 'all' || g.cat === S.cat) && itemsOf(g.id).length && groupMatches(g, q)).sort((a, b) => a.order - b.order);
+}
+function sellView() {
+  const cats = [{ id: 'all', ar: t('all'), en: t('all') }, ...S.cats];
+  const nav = cats.map((c) => {
+    const n = c.id === 'all' ? S.groups.length : S.groups.filter((g) => g.cat === c.id).length;
+    return `<button class="sidebtn ${S.cat === c.id ? 'on' : ''}" data-act="cat" data-id="${c.id}" aria-pressed="${S.cat === c.id}"><b>${esc(L(c.ar, c.en))}</b><small>${esc(t('items', n))}</small></button>`;
+  }).join('');
+  return `<div class="body">
+    <nav class="side cats scroll" aria-label="categories">${nav}</nav>
+    <main class="sell">
+      <div class="searchrow"><label class="search">${ICON.search}<span class="sr">${esc(t('search'))}</span>
+        <input id="q" type="search" autocomplete="off" placeholder="${esc(t('search'))}" value="${esc(S.q)}" data-in="q">
+        ${S.q ? `<button class="x" data-act="clearQ" aria-label="clear">${ICON.x}</button>` : ''}</label></div>
+      <div id="gridArea" class="gridwrap scroll">${gridHtml()}</div>
+    </main>
+    <aside class="cart" id="cartArea">${cartHtml()}</aside>
+  </div>`;
+}
+function gridHtml() {
+  const gs = visibleGroups();
+  const title = S.q.trim() ? t('results') : L(...(S.cat === 'all' ? [t('all'), t('all')] : (() => { const c = S.cats.find((x) => x.id === S.cat); return [c.ar, c.en]; })()));
+  const head = `<div class="gridhead"><b>${esc(title)}</b><span>${esc(t('items', gs.length))}</span></div>`;
+  if (!gs.length) return head + `<div class="empty"><b>${esc(t('noResults'))}</b></div>`;
+  const tiles = gs.map((g) => {
+    const its = itemsOf(g.id), avail = its.filter(isAvail), multi = its.length > 1;
+    const prices = (avail.length ? avail : its).map((i) => i.sell).filter((p) => p > 0);
+    const min = prices.length ? Math.min(...prices) : null, same = prices.every((p) => p === min);
+    const off = !avail.length, priced = prices.length > 0;
+    const img = its[0].img;
+    const price = !priced ? t('noPrice') : `${multi && !same ? t('from') + ' ' : ''}${jd(min)} ${t('jd')}`;
+    return `<button class="tile ${off ? 'off' : ''}" data-act="tile" data-id="${g.id}" ${off ? 'disabled' : ''} aria-label="${esc(L(g.ar, g.en))}${off ? ' - ' + esc(t('unavailable')) : ''}">
+      <div class="ph"><img src="${esc(img)}" alt="" loading="lazy" decoding="async">
+        ${multi ? `<span class="badge">${esc(t('flavors', its.length))}</span>` : ''}
+        ${off ? `<span class="badge mid">${esc(t('unavailable'))}</span>` : ''}</div>
+      <span class="nm">${esc(L(g.ar, g.en))}</span><span class="pr num">${esc(price)}</span></button>`;
+  }).join('');
+  return head + `<div class="grid">${tiles}</div>`;
+}
+const cartTotal = () => S.cart.reduce((a, l) => a + l.price * l.qty, 0);
+function cartHtml() {
+  const total = cartTotal(), empty = !S.cart.length, count = S.cart.reduce((a, l) => a + l.qty, 0);
+  const lines = empty
+    ? `<div class="empty"><div class="ring">${ICON.cart}</div><b>${esc(t('emptyCart'))}</b><span>${esc(t('emptyHint'))}</span></div>`
+    : S.cart.map((l, i) => {
+      const it = S.items[l.id];
+      return `<div class="line"><div class="thumb"><img src="${esc(it ? it.img : '')}" alt=""></div>
+        <div class="info"><b>${esc(it ? itemName(it) : l.name)}</b><small class="num">${jd(l.price)} × ${l.qty}</small></div>
+        <div class="qty"><button data-act="inc" data-i="${i}" aria-label="+">+</button><span class="num">${l.qty}</span><button data-act="dec" data-i="${i}" aria-label="-">−</button></div>
+        <span class="lt num">${jd(l.price * l.qty)}</span></div>`;
+    }).join('');
+  const pays = ['cash', 'visa', 'cliq'].map((p) => `<button class="segbtn ${S.pay === p ? 'on' : ''}" data-act="pay" data-id="${p}" aria-pressed="${S.pay === p}">${esc(t(p))}</button>`).join('');
+  let cash = '';
+  if (S.pay === 'cash' && !empty) {
+    const amts = [[t('exact'), total], ['1', 1000], ['5', 5000], ['10', 10000], ['20', 20000]];
+    const ch = S.given == null ? null : S.given - total;
+    cash = `<span class="lbl">${esc(t('received'))}</span>
+      <div class="seg seg5">${amts.map(([lab, v]) => `<button class="segbtn ${S.given === v ? 'on' : ''}" data-act="given" data-v="${v}">${esc(lab)}</button>`).join('')}</div>
+      <div class="change"><span>${esc(t('change'))}</span><b class="num">${ch == null ? '—' : ch < 0 ? esc(t('short')) : jd(ch) + ' ' + esc(t('jd'))}</b></div>`;
+  }
+  return `<div class="cartcard">
+    <div class="carthead"><div><b>${esc(t('order'))}</b>${empty ? '' : `<span class="count num">${count}</span>`}</div>${empty ? '' : `<button class="btn-ghost" data-act="clearCart">${esc(t('clear'))}</button>`}</div>
+    <div class="lines scroll">${lines}</div>
+    <div class="cartfoot">
+      <div class="total"><span>${esc(t('total'))}</span><b class="num">${jd(total)} <small>${esc(t('jd'))}</small></b></div>
+      <div class="seg seg3" role="group">${pays}</div>${cash}
+      <div class="actions"><button class="btn hosp" data-act="hosp" ${empty ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('hosp'))}</span></button>
+        <button class="btn primary big" data-act="checkout" ${empty ? 'disabled' : ''}>${esc(t('checkout'))}</button></div>
+    </div></div>`;
+}
+const rerenderCart = () => { const c = $('#cartArea'); if (c) c.innerHTML = cartHtml(); };
+const rerenderGrid = () => { const g = $('#gridArea'); if (g) g.innerHTML = gridHtml(); };
+
+function addToCart(id) {
+  const it = S.items[id];
+  if (!it || !isAvail(it)) return;
+  const inCart = S.cart.filter((l) => l.id === id).reduce((a, l) => a + l.qty, 0);
+  if (inCart >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock} من ${itemName(it)}` : `Only ${it.stock} left`, true); return; }
+  const l = S.cart.find((x) => x.id === id);
+  if (l) l.qty++; else S.cart.push({ id, name: itemName(it), price: it.sell, qty: 1 });
+  S.given = null;
+  closeModal(); rerenderCart();
+}
+
+function flavorSheet(gid) {
+  const g = S.groups.find((x) => x.id === gid), its = itemsOf(gid);
+  const btns = its.map((i) => {
+    const ok = isAvail(i);
+    const sub = ok ? `${jd(i.sell)} ${t('jd')}` : !(i.sell > 0) ? t('noPrice') : t('soldOut');
+    return `<button class="vbtn" data-act="addItem" data-id="${i.id}" ${ok ? '' : 'disabled'}><img src="${esc(i.img)}" alt=""><b>${esc(L(i.ar, i.en) || L(g.ar, g.en))}</b><span class="pr num">${esc(sub)}</span></button>`;
+  }).join('');
+  openModal(`<div class="modal" role="dialog" aria-label="${esc(L(g.ar, g.en))}">
+    <div class="mhead"><div class="mimg"><img src="${esc(its[0].img)}" alt=""></div><div class="grow"><b>${esc(L(g.ar, g.en))}</b><small>${esc(t('pickFlavor'))}</small></div>
+      <button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+    <div class="mbody scroll"><div class="vgrid">${btns}</div></div></div>`);
+}
+
+/* ---------- saving sales (one atomic write: sale + stock) ---------- */
+async function saveSale(type) {
+  if (!S.cart.length) return;
+  for (const l of S.cart) { const it = S.items[l.id]; if (!it || it.stock < l.qty) { toast(S.lang === 'ar' ? 'المخزون ما بيكفي' : 'Not enough stock', true); return; } }
+  const now = Date.now();
+  const lines = S.cart.map((l) => { const it = S.items[l.id]; const c = unitCost(it); return { id: l.id, name: itemName(it), nameAr: (() => { const g = groupOf(it); return it.ar ? `${g.ar} - ${it.ar}` : g.ar; })(), qty: l.qty, price: l.price, cost: c == null ? null : Math.round(c * 1000) / 1000 }; });
+  const total = lines.reduce((a, l) => a + l.price * l.qty, 0);
+  const cost = lines.reduce((a, l) => a + (l.cost || 0) * l.qty, 0);
+  const sale = { id: now.toString(36) + '-' + Math.random().toString(36).slice(2, 6), ts: now, day: dayOf(new Date(now)), no: S.dayCount + 1, type, pay: type === 'sale' ? S.pay : null, given: type === 'sale' && S.pay === 'cash' ? S.given : null, lines, total, cost, voided: false, syncedFlag: 0 };
+  const items = JSON.parse(JSON.stringify(S.items));
+  for (const l of lines) items[l.id].stock -= l.qty;
+  try {
+    await DB.tx(['kv', 'sales'], 'readwrite', (tx) => {
+      tx.objectStore('kv').put({ cats: S.cats, groups: S.groups, items, seedVersion: SEED.version }, 'catalog');
+      tx.objectStore('sales').put(sale);
+    });
+  } catch (e) { toast((S.lang === 'ar' ? 'ما انحفظت العملية: ' : 'Not saved: ') + e.message, true); return; }
+  S.items = items; S.dayCount++; S.pending++;
+  S.cart = []; S.given = null;
+  toast(type === 'hosp' ? t('hospDone', jd(total)) : t('sold', jd(total), t(sale.pay)));
+  render();
+  syncSoon();
+}
+
+/* ---------- modals & toast ---------- */
+function openModal(html) { $('#modal').innerHTML = `<div class="overlay" data-act="overlay">${html}</div>`; }
+function closeModal() { $('#modal').innerHTML = ''; S.modal = null; }
+let toastTimer;
+function toast(msg, bad) {
+  $('#toast').innerHTML = `<div class="toast ${bad ? 'bad' : ''}" role="status"><span class="ok">${bad ? ICON.x.replace('currentColor', '#fff') : ICON.check}</span><span>${esc(msg)}</span></div>`;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('#toast').innerHTML = ''; }, 2600);
+}
+function askPin(sub, onOk) {
+  S.modal = { kind: 'pin', val: '', sub, onOk, err: '' };
+  drawPin();
+}
+function drawPin() {
+  const m = S.modal;
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
+  openModal(`<div class="modal narrow" role="dialog" aria-label="${esc(t('pinTitle'))}">
+    <div class="mhead"><div class="grow"><b>${esc(t('pinTitle'))}</b><small>${esc(m.sub)}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+    <div class="mbody"><div class="dots">${Array.from({ length: Math.max(4, m.val.length) }, (_, i) => `<i class="${i < m.val.length ? 'f' : ''}"></i>`).join('')}</div>
+      <div class="err" style="text-align:center">${esc(m.err)}</div>
+      <div class="pinpad">${keys.map((k) => `<button data-act="pin" data-k="${k}" ${k === 'ok' ? 'style="background:var(--acc);border-color:var(--acc);color:#fff;font-size:16px"' : ''}>${k === 'del' ? '⌫' : k === 'ok' ? esc(t('ok')) : k}</button>`).join('')}</div></div></div>`);
+}
+async function pinKey(k) {
+  const m = S.modal; if (!m || m.kind !== 'pin') return;
+  if (k === 'del') m.val = m.val.slice(0, -1);
+  else if (k === 'ok') {
+    if ((await sha(m.val)) === S.settings.pin) { const cb = m.onOk; closeModal(); cb(); return; }
+    m.err = t('wrongPin'); m.val = '';
+  } else if (m.val.length < 8) { m.val += k; m.err = ''; }
+  drawPin();
+}
+
+/* ---------- admin ---------- */
+function adminView() {
+  const tabs = [['items', 'tItems', 'tItemsSub'], ['eod', 'tEod', 'tEodSub'], ['sales', 'tSales', 'tSalesSub'], ['hosp', 'tHosp', 'tHospSub'], ['barista', 'tBarista', 'tBaristaSub'], ['settings', 'tSettings', 'tSettingsSub']];
+  const nav = tabs.map(([id, a, b]) => `<button class="sidebtn ${S.admin.tab === id ? 'on' : ''}" data-act="tab" data-id="${id}"><b>${esc(t(a))}</b><small>${esc(t(b))}</small></button>`).join('');
+  return `<div class="body"><nav class="side tabs scroll">${nav}</nav><main class="admin scroll" id="adminMain">${adminTabHtml()}</main></div>`;
+}
+let adminCache = null;
+function adminTabHtml() {
+  switch (S.admin.tab) {
+    case 'items': return itemsTab();
+    case 'eod': return reportTab('eod');
+    case 'sales': return reportTab('sales');
+    case 'hosp': return reportTab('hosp');
+    case 'barista': return `<div class="empty" style="height:560px"><div class="ring">${ICON.cup.replace('#fff', '#8F8B82')}</div><b>${esc(t('tBarista'))}</b><span>${S.lang === 'ar' ? 'فاضية حالياً · بنعبّيها لما نتفق على حسبة القهوة' : 'Empty for now'}</span></div>`;
+    case 'settings': return settingsTab();
+  }
+  return '';
+}
+const rerenderAdmin = () => { const m = $('#adminMain'); if (!m) return; const f = rememberFocus(); m.innerHTML = adminTabHtml(); restoreFocus(f); };
+
+function itemsTab() {
+  const q = S.admin.q.trim();
+  const all = Object.values(S.items);
+  const onN = all.filter(isAvail).length, lowN = all.filter((i) => isAvail(i) && i.stock <= lowLimit(i)).length;
+  const needN = all.filter((i) => !(i.sell > 0) || !(i.units > 0)).length;
+  const chips = [{ id: 'all', ar: 'الكل', en: 'All' }, ...S.cats, { id: 'need', ar: 'ناقصها معلومات', en: 'Missing info' }, { id: 'low', ar: 'قربت تخلص', en: 'Low stock' }]
+    .map((c) => `<button class="chip ${S.admin.cat === c.id ? 'on' : ''}" data-act="acat" data-id="${c.id}">${esc(L(c.ar, c.en))}</button>`).join('');
+  const gs = S.groups.filter((g) => (S.admin.cat === 'all' || ['need', 'low'].includes(S.admin.cat) || g.cat === S.admin.cat) && groupMatches(g, q)).sort((a, b) => a.order - b.order);
+  let rows = '';
+  for (const g of gs) {
+    let its = itemsOf(g.id);
+    if (S.admin.cat === 'need') its = its.filter((i) => !(i.sell > 0) || !(i.units > 0));
+    if (S.admin.cat === 'low') its = its.filter((i) => i.stock <= lowLimit(i));
+    if (!its.length) continue;
+    if (its.length > 1) rows += `<tr class="grp"><td colspan="8" class="s">${esc(L(g.ar, g.en))} · ${esc(t('flavors', its.length))}</td></tr>`;
+    for (const it of its) {
+      const c = unitCost(it), p = it.sell > 0 && c != null ? it.sell - c : null;
+      const on = isAvail(it), st = it.stock;
+      const bx = it.units > 0 ? `${Math.floor(st / it.units)} ${S.lang === 'ar' ? 'صندوق و' : 'box + '}${st % it.units} ${S.lang === 'ar' ? 'حبة' : 'pcs'}` : '';
+      const stCls = st <= 0 ? 'zero' : st <= lowLimit(it) ? 'low' : '';
+      rows += `<tr class="${on ? '' : 'off'}">
+        <td class="s"><div class="namecell"><div class="thumb"><img src="${esc(it.img)}" alt=""></div><div><b>${esc(it.ar || it.en ? L(it.ar, it.en) : L(g.ar, g.en))}</b><small>${esc(its.length > 1 ? L(g.ar, g.en) : L(S.cats.find((x) => x.id === g.cat)?.ar, S.cats.find((x) => x.id === g.cat)?.en))}</small></div>
+          <button class="btn sm" data-act="editItem" data-id="${it.id}" style="margin-inline-start:auto">${S.lang === 'ar' ? 'تعديل' : 'Edit'}</button></div></td>
+        <td><input class="ti num" id="box-${it.id}" inputmode="decimal" value="${jd(it.box)}" data-chg="box" data-id="${it.id}" aria-label="box price"></td>
+        <td><input class="ti u num ${it.units > 0 ? '' : 'need'}" id="units-${it.id}" inputmode="numeric" value="${it.units > 0 ? it.units : ''}" placeholder="؟" data-chg="units" data-id="${it.id}" aria-label="pieces per box"></td>
+        <td><input class="ti num" id="cost-${it.id}" inputmode="decimal" value="${c == null ? '' : jd(c)}" placeholder="—" data-chg="cost" data-id="${it.id}" ${it.units > 0 ? '' : 'disabled'} aria-label="unit cost"></td>
+        <td><input class="ti num ${it.sell > 0 ? '' : 'need'}" id="sell-${it.id}" inputmode="decimal" value="${it.sell > 0 ? jd(it.sell) : ''}" placeholder="؟" data-chg="sell" data-id="${it.id}" aria-label="selling price"></td>
+        <td class="num ${p == null ? '' : p >= 0 ? 'pos' : 'neg'}">${p == null ? '—' : jd(p)}</td>
+        <td><div class="stk"><div class="v"><span class="num ${stCls}">${st} ${S.lang === 'ar' ? 'حبة' : 'pcs'}</span><small>${esc(bx)}</small></div>
+          <div class="bs"><button class="btn sm" data-act="stock" data-mode="box" data-id="${it.id}" ${it.units > 0 ? '' : 'disabled'}>+ ${S.lang === 'ar' ? 'صندوق' : 'Box'}</button><button class="btn sm" data-act="stock" data-mode="piece" data-id="${it.id}">+ ${S.lang === 'ar' ? 'حبة' : 'Pcs'}</button></div>
+          <button class="btn sm" data-act="stock" data-mode="set" data-id="${it.id}" title="جرد">${S.lang === 'ar' ? 'جرد' : 'Count'}</button></div></td>
+        <td><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="toggle" data-id="${it.id}"><i></i><span>${on ? 'ON' : 'OFF'}</span></button></td></tr>`;
+    }
+  }
+  return `<div class="ahead"><div><h1>${esc(t('tItems'))}</h1><p>${S.lang === 'ar' ? 'عدّل سعر الصندوق، عدد الحبات، تكلفة الحبة أو سعر البيع، والباقي بيتحدّث لحاله. السعر الجديد بيمشي على المبيعات الجاية بس.' : 'Edit box price, pieces, unit cost or selling price; the rest updates. New prices apply to future sales only.'}</p></div>
+      <button class="btn primary" data-act="newItem">+ ${S.lang === 'ar' ? 'صنف جديد' : 'New item'}</button></div>
+    <div class="kpis k3"><div class="kpi"><span>${S.lang === 'ar' ? 'أصناف ON' : 'Items ON'}</span><b class="num">${onN}</b></div>
+      <div class="kpi"><span>${S.lang === 'ar' ? 'قربت تخلص' : 'Low stock'}</span><b class="num low">${lowN}</b></div>
+      <div class="kpi"><span>${S.lang === 'ar' ? 'ناقصها سعر بيع أو عدد حبات' : 'Missing price or pieces'}</span><b class="num" style="color:var(--acc)">${needN}</b></div></div>
+    <div class="toolbar"><label class="search">${ICON.search}<input id="aq" type="search" placeholder="${esc(t('search'))}" value="${esc(S.admin.q)}" data-in="aq"></label><div class="chips">${chips}</div></div>
+    <div class="card"><table class="tbl"><thead><tr><th class="s" style="width:28%">${S.lang === 'ar' ? 'الصنف' : 'Item'}</th><th>${S.lang === 'ar' ? 'سعر الصندوق' : 'Box price'}</th><th>${S.lang === 'ar' ? 'حبات' : 'Pcs'}</th><th>${S.lang === 'ar' ? 'تكلفة الحبة' : 'Unit cost'}</th><th>${S.lang === 'ar' ? 'سعر البيع' : 'Price'}</th><th>${S.lang === 'ar' ? 'ربح الحبة' : 'Profit'}</th><th>${S.lang === 'ar' ? 'المخزون' : 'Stock'}</th><th>ON / OFF</th></tr></thead><tbody>${rows || `<tr><td colspan="8" style="height:120px;color:var(--muted)">${esc(t('noResults'))}</td></tr>`}</tbody></table></div>
+    <p class="note">${S.lang === 'ar' ? 'لما مخزون أي صنف يوصل صفر بيصير OFF لحاله، وبيرجع ON لما تضيف كمية. والصنف بدون سعر بيع ما بينباع.' : 'Items at zero stock turn OFF automatically and come back ON when you add stock. Items without a price cannot be sold.'}</p>`;
+}
+
+async function changeField(field, id, raw) {
+  const it = S.items[id]; if (!it) return;
+  if (field === 'units') { const v = parseInt(raw, 10); it.units = isNaN(v) || v <= 0 ? null : v; }
+  else {
+    const f = toFils(raw);
+    if (raw.trim() === '') { if (field === 'sell') it.sell = null; }
+    else if (f == null) { toast(S.lang === 'ar' ? 'رقم غلط' : 'Invalid number', true); rerenderAdmin(); return; }
+    else if (field === 'box') it.box = f;
+    else if (field === 'sell') it.sell = f;
+    else if (field === 'cost' && it.units > 0) it.box = Math.round(f * it.units);
+  }
+  await saveCatalog();
+  rerenderAdmin();
+}
+
+function stockModal(id, mode) {
+  const it = S.items[id];
+  const title = mode === 'box' ? (S.lang === 'ar' ? 'إضافة صناديق' : 'Add boxes') : mode === 'piece' ? (S.lang === 'ar' ? 'إضافة حبات' : 'Add pieces') : (S.lang === 'ar' ? 'جرد: العدد الفعلي بالحبات' : 'Count: actual pieces');
+  const quick = mode === 'set' ? [] : [1, 2, 3, 5, 10];
+  S.modal = { kind: 'stock', id, mode };
+  openModal(`<div class="modal narrow" role="dialog" aria-label="${esc(title)}">
+    <div class="mhead"><div class="mimg"><img src="${esc(it.img)}" alt=""></div><div class="grow"><b>${esc(title)}</b><small>${esc(itemName(it))} · ${S.lang === 'ar' ? 'الحالي' : 'now'}: ${it.stock}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+    <div class="mbody">
+      ${quick.length ? `<div class="seg seg5">${quick.map((n) => `<button class="segbtn" data-act="qset" data-v="${n}">${n}</button>`).join('')}</div>` : ''}
+      <div class="field"><label for="qtyIn">${mode === 'box' ? (S.lang === 'ar' ? `عدد الصناديق (كل صندوق ${it.units} حبة)` : `Boxes (${it.units} pcs each)`) : (S.lang === 'ar' ? 'عدد الحبات' : 'Pieces')}</label>
+        <input class="inp c num" id="qtyIn" type="number" inputmode="numeric" min="0" value="${mode === 'set' ? it.stock : 1}"></div>
+      <div class="actions"><button class="btn" data-act="closeModal" style="flex:1">${esc(t('cancel'))}</button><button class="btn primary" data-act="stockOk" style="flex:2">${esc(t('ok'))}</button></div></div></div>`);
+  setTimeout(() => { const i = $('#qtyIn'); if (i) { i.focus(); i.select(); } }, 50);
+}
+async function stockOk() {
+  const m = S.modal, it = S.items[m.id];
+  const n = parseInt($('#qtyIn').value, 10);
+  if (isNaN(n) || n < 0) { toast(S.lang === 'ar' ? 'رقم غلط' : 'Invalid number', true); return; }
+  const before = it.stock;
+  if (m.mode === 'box') it.stock += n * it.units; else if (m.mode === 'piece') it.stock += n; else it.stock = n;
+  await saveCatalog();
+  const log = (await DB.get('stocklog')) || []; log.push({ ts: Date.now(), id: it.id, name: itemName(it), mode: m.mode, before, after: it.stock }); await DB.set('stocklog', log.slice(-2000));
+  closeModal(); rerenderAdmin();
+  toast(`${itemName(it)}: ${before} → ${it.stock}`);
+}
+
+/* item editor */
+function itemModal(id) {
+  const it = id ? S.items[id] : null, g = it ? groupOf(it) : null;
+  S.modal = { kind: 'item', id, img: it ? it.img : null };
+  const gopts = S.groups.slice().sort((a, b) => a.ar.localeCompare(b.ar, 'ar')).map((x) => `<option value="${x.id}" ${g && g.id === x.id ? 'selected' : ''}>${esc(L(x.ar, x.en))}</option>`).join('');
+  const copts = S.cats.map((c) => `<option value="${c.id}" ${g && g.cat === c.id ? 'selected' : ''}>${esc(L(c.ar, c.en))}</option>`).join('');
+  const A = S.lang === 'ar';
+  openModal(`<div class="modal" role="dialog" aria-label="item">
+    <div class="mhead"><div class="grow"><b>${it ? (A ? 'تعديل صنف' : 'Edit item') : (A ? 'صنف جديد' : 'New item')}</b><small>${A ? 'إذا الصنف نكهة لصنف موجود، اختار مجموعته' : 'If it is a flavour of an existing item, pick its group'}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+    <div class="mbody scroll">
+      <div class="row2"><div class="field"><label for="fGroup">${A ? 'المجموعة' : 'Group'}</label><select class="inp" id="fGroup"><option value="__new" ${g ? '' : 'selected'}>${A ? '+ مجموعة جديدة' : '+ New group'}</option>${gopts}</select></div>
+        <div class="field"><label for="fCat">${A ? 'التصنيف' : 'Category'}</label><select class="inp" id="fCat">${copts}</select></div></div>
+      <div class="row2"><div class="field"><label for="fGar">${A ? 'اسم المجموعة / الصنف (عربي)' : 'Group / item name (Arabic)'}</label><input class="inp" id="fGar" value="${esc(g ? g.ar : '')}"></div>
+        <div class="field"><label for="fGen">${A ? 'الاسم بالإنجليزي' : 'Name (English)'}</label><input class="inp" id="fGen" dir="ltr" value="${esc(g ? g.en : '')}"></div></div>
+      <div class="row2"><div class="field"><label for="fVar">${A ? 'النكهة (اختياري)' : 'Flavour (optional)'}</label><input class="inp" id="fVar" value="${esc(it ? it.ar || '' : '')}"></div>
+        <div class="field"><label for="fVen">${A ? 'النكهة بالإنجليزي' : 'Flavour (English)'}</label><input class="inp" id="fVen" dir="ltr" value="${esc(it ? it.en || '' : '')}"></div></div>
+      <div class="row2"><div class="field"><label for="fBox">${A ? 'سعر الصندوق (د.أ)' : 'Box price (JD)'}</label><input class="inp num" id="fBox" inputmode="decimal" value="${it ? jd(it.box) : ''}"></div>
+        <div class="field"><label for="fUnits">${A ? 'عدد الحبات بالصندوق' : 'Pieces per box'}</label><input class="inp num" id="fUnits" inputmode="numeric" value="${it && it.units ? it.units : ''}"></div></div>
+      <div class="row2"><div class="field"><label for="fSell">${A ? 'سعر بيع الحبة (د.أ)' : 'Selling price (JD)'}</label><input class="inp num" id="fSell" inputmode="decimal" value="${it && it.sell ? jd(it.sell) : ''}"></div>
+        <div class="field"><label>${A ? 'الصورة' : 'Photo'}</label><div class="imgpick"><div class="thumb" id="fImgPrev">${it ? `<img src="${esc(it.img)}" alt="">` : ''}</div><label class="btn sm">${A ? 'اختار صورة' : 'Choose photo'}<input type="file" accept="image/*" id="fImg" class="sr"></label></div></div></div>
+      <div class="err" id="fErr"></div>
+      <div class="actions">${it ? `<button class="btn danger" data-act="delItem">${A ? 'حذف الصنف' : 'Delete'}</button>` : ''}<span class="grow"></span><button class="btn" data-act="closeModal">${esc(t('cancel'))}</button><button class="btn primary" data-act="saveItem">${A ? 'حفظ' : 'Save'}</button></div>
+    </div></div>`);
+}
+function pickImage(file) {
+  const r = new FileReader();
+  r.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, 240 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+      const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+      S.modal.img = c.toDataURL('image/webp', 0.8);
+      $('#fImgPrev').innerHTML = `<img src="${S.modal.img}" alt="">`;
+    };
+    img.src = r.result;
+  };
+  r.readAsDataURL(file);
+}
+async function saveItem() {
+  const m = S.modal, A = S.lang === 'ar';
+  const gsel = $('#fGroup').value, cat = $('#fCat').value, gar = $('#fGar').value.trim(), gen = $('#fGen').value.trim();
+  const vAr = $('#fVar').value.trim(), vEn = $('#fVen').value.trim();
+  const box = toFils($('#fBox').value || '0'), units = parseInt($('#fUnits').value, 10), sell = $('#fSell').value.trim() ? toFils($('#fSell').value) : null;
+  if (!gar) { $('#fErr').textContent = A ? 'اكتب اسم الصنف' : 'Enter a name'; return; }
+  if (box == null) { $('#fErr').textContent = A ? 'سعر الصندوق غلط' : 'Invalid box price'; return; }
+  if (!m.img && !m.id) { m.img = 'icons/icon-192.png'; }
+  let gid = gsel;
+  if (gsel === '__new') { gid = 'g' + uid(); S.groups.push({ id: gid, ar: gar, en: gen, cat, order: S.groups.length }); }
+  else { const g = S.groups.find((x) => x.id === gid); g.ar = gar; g.en = gen; g.cat = cat; }
+  if (m.id) {
+    const it = S.items[m.id];
+    Object.assign(it, { groupId: gid, ar: vAr || null, en: vEn || null, box, units: isNaN(units) || units <= 0 ? null : units, sell, img: m.img || it.img });
+  } else {
+    const id = 'i' + uid();
+    S.items[id] = { id, groupId: gid, ar: vAr || null, en: vEn || null, img: m.img, box, units: isNaN(units) || units <= 0 ? null : units, sell, stock: 0, off: false, sku: null, order: itemsOf(gid).length };
+  }
+  cleanupGroups();
+  await saveCatalog();
+  closeModal(); rerenderAdmin(); toast(A ? 'انحفظ' : 'Saved');
+}
+function cleanupGroups() { S.groups = S.groups.filter((g) => Object.values(S.items).some((i) => i.groupId === g.id)); }
+async function delItem() {
+  const m = S.modal, it = S.items[m.id];
+  if (!confirm((S.lang === 'ar' ? 'حذف ' : 'Delete ') + itemName(it) + '؟')) return;
+  delete S.items[m.id]; cleanupGroups(); await saveCatalog(); closeModal(); rerenderAdmin();
+}
+
+/* ---------- reports ---------- */
+async function loadRange() {
+  const sales = await DB.salesRange(S.admin.from, S.admin.to);
+  sales.sort((a, b) => b.ts - a.ts);
+  adminCache = { key: S.admin.from + S.admin.to + S.admin.tab, sales };
+  rerenderAdmin();
+}
+function aggregate(sales) {
+  const live = sales.filter((s) => !s.voided);
+  const sold = live.filter((s) => s.type === 'sale'), hosp = live.filter((s) => s.type === 'hosp');
+  const rev = sold.reduce((a, s) => a + s.total, 0), cogs = sold.reduce((a, s) => a + s.cost, 0);
+  const hospSell = hosp.reduce((a, s) => a + s.total, 0), hospCost = hosp.reduce((a, s) => a + s.cost, 0);
+  const byPay = { cash: 0, visa: 0, cliq: 0 }; sold.forEach((s) => { byPay[s.pay] = (byPay[s.pay] || 0) + s.total; });
+  const byItem = {};
+  sold.forEach((s) => s.lines.forEach((l) => { const k = l.id; const o = byItem[k] || (byItem[k] = { name: l.name, qty: 0, rev: 0, cost: 0 }); o.qty += l.qty; o.rev += l.price * l.qty; o.cost += (l.cost || 0) * l.qty; }));
+  const byDay = {};
+  live.forEach((s) => { const o = byDay[s.day] || (byDay[s.day] = { day: s.day, orders: 0, rev: 0, cost: 0, hospSell: 0, hospCost: 0, cash: 0, visa: 0, cliq: 0 }); if (s.type === 'sale') { o.orders++; o.rev += s.total; o.cost += s.cost; o[s.pay] += s.total; } else { o.hospSell += s.total; o.hospCost += s.cost; } });
+  return { sold, hosp, rev, cogs, hospSell, hospCost, profit: rev - cogs - hospCost, byPay, byItem, byDay, orders: sold.length };
+}
+function dateBar() {
+  const A = S.lang === 'ar';
+  return `<div class="datebar"><label class="sr" for="dFrom">from</label><input type="date" id="dFrom" value="${S.admin.from}" data-date="from"><span>${A ? 'إلى' : 'to'}</span><label class="sr" for="dTo">to</label><input type="date" id="dTo" value="${S.admin.to}" data-date="to">
+    <button class="chip" data-act="range" data-id="today">${A ? 'اليوم' : 'Today'}</button><button class="chip" data-act="range" data-id="week">${A ? 'آخر 7 أيام' : 'Last 7 days'}</button><button class="chip" data-act="range" data-id="month">${A ? 'هالشهر' : 'This month'}</button></div>`;
+}
+function reportTab(kind) {
+  const key = S.admin.from + S.admin.to + S.admin.tab;
+  if (!adminCache || adminCache.key !== key) { loadRange(); return `<div class="empty">...</div>`; }
+  const A = S.lang === 'ar', ag = aggregate(adminCache.sales);
+  const rangeTxt = S.admin.from === S.admin.to ? S.admin.from : `${S.admin.from} → ${S.admin.to}`;
+  const exportBtns = `<button class="btn" data-act="excel">${A ? 'تنزيل Excel' : 'Download Excel'}</button><button class="btn dark" data-act="syncNow">${A ? 'رفع على الشيت' : 'Upload to sheet'}</button>`;
+  if (kind === 'eod') {
+    const pays = ['cash', 'visa', 'cliq'], col = { cash: 'var(--acc)', visa: 'var(--ink)', cliq: '#7C7F88' };
+    const bars = pays.map((p) => { const v = ag.byPay[p] || 0, pct = ag.rev ? Math.round((v / ag.rev) * 100) : 0; return `<div class="bar"><div class="t"><span>${esc(t(p))}</span><span class="num">${jd(v)} <small>· ${pct}%</small></span></div><div class="track"><div class="fill" style="width:${pct}%;background:${col[p]}"></div></div></div>`; }).join('');
+    const top = Object.values(ag.byItem).sort((a, b) => b.qty - a.qty);
+    const trs = top.map((o) => `<tr><td class="s">${esc(o.name)}</td><td class="num">${o.qty}</td><td class="num">${jd(o.rev)}</td><td class="num">${jd(o.cost)}</td><td class="num pos">${jd(o.rev - o.cost)}</td></tr>`).join('');
+    return `<div class="ahead"><div><h1>End of Day</h1><p>${esc(rangeTxt)}</p></div><div class="actions">${exportBtns}</div></div>
+      <div class="toolbar">${dateBar()}</div>
+      <div class="kpis"><div class="kpi dark"><span>${A ? 'إجمالي المبيعات' : 'Total sales'}</span><b class="num">${jd(ag.rev)}</b><small>${ag.orders} ${A ? 'طلب' : 'orders'} · ${esc(t('jd'))}</small></div>
+        <div class="kpi"><span>${A ? 'تكلفة اللي انباع' : 'Cost of goods'}</span><b class="num">${jd(ag.cogs)}</b><small>${esc(t('jd'))}</small></div>
+        <div class="kpi"><span>${A ? 'الضيافة (بالتكلفة)' : 'Hospitality (cost)'}</span><b class="num neg">-${jd(ag.hospCost)}</b><small>${A ? 'بسعر البيع' : 'at price'}: -${jd(ag.hospSell)}</small></div>
+        <div class="kpi"><span>${A ? 'صافي الربح' : 'Net profit'}</span><b class="num ${ag.profit >= 0 ? 'pos' : 'neg'}">${jd(ag.profit)}</b><small>${esc(t('jd'))}</small></div></div>
+      <div class="cols"><div class="card"><h2>${A ? 'حسب طريقة الدفع' : 'By payment'}</h2><div class="bars">${bars}</div><div class="drawer"><span>${A ? 'لازم يكون بالدرج كاش' : 'Cash expected in drawer'}</span><span class="num">${jd(ag.byPay.cash || 0)} ${esc(t('jd'))}</span></div></div>
+        <div class="card"><h2>${A ? 'الأصناف المباعة' : 'Items sold'}</h2><div class="scroll" style="max-height:360px"><table class="tbl"><thead><tr><th class="s">${A ? 'الصنف' : 'Item'}</th><th>${A ? 'الكمية' : 'Qty'}</th><th>${A ? 'الإيراد' : 'Revenue'}</th><th>${A ? 'التكلفة' : 'Cost'}</th><th>${A ? 'الربح' : 'Profit'}</th></tr></thead><tbody>${trs || `<tr><td colspan="5" style="height:80px;color:var(--muted)">${A ? 'ما في مبيعات' : 'No sales'}</td></tr>`}</tbody></table></div></div></div>`;
+  }
+  if (kind === 'hosp') {
+    const rows = ag.hosp.flatMap((s) => s.lines.map((l) => `<tr><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num neg">-${jd(l.price * l.qty)}</td><td class="num">${jd((l.cost || 0) * l.qty)}</td></tr>`)).join('');
+    return `<div class="ahead"><div><h1>${esc(t('tHosp'))}</h1><p>${A ? 'بتنحسب تكلفة بدون إيراد، وبتطلع بالإكسل بالسالب' : 'Counted as cost with no revenue; negative in Excel'}</p></div><div class="actions">${exportBtns}</div></div>
+      <div class="toolbar">${dateBar()}</div>
+      <div class="card"><table class="tbl"><thead><tr><th>${A ? 'الوقت' : 'Time'}</th><th class="s">${A ? 'الصنف' : 'Item'}</th><th>${A ? 'الكمية' : 'Qty'}</th><th>${A ? 'بسعر البيع' : 'At price'}</th><th>${A ? 'التكلفة' : 'Cost'}</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="5" style="height:80px;color:var(--muted)">${A ? 'ما في ضيافة' : 'None'}</td></tr>`}<tr><td></td><td class="s"><b>${A ? 'المجموع' : 'Total'}</b></td><td></td><td class="num neg">-${jd(ag.hospSell)}</td><td class="num">${jd(ag.hospCost)}</td></tr></tbody></table></div>`;
+  }
+  const rows = adminCache.sales.map((s) => `<tr class="${s.voided ? 'voided' : ''}"><td class="num">#${s.no}</td><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(s.lines.map((l) => `${l.name} ×${l.qty}`).join('، '))}</td>
+    <td>${s.type === 'hosp' ? `<span class="tag h">${esc(t('hosp'))}</span>` : `<span class="tag">${esc(t(s.pay))}</span>`}</td><td class="num ${s.type === 'hosp' ? 'neg' : ''}">${s.type === 'hosp' ? '-' : ''}${jd(s.total)}</td>
+    <td>${s.voided ? (A ? 'ملغي' : 'Void') : `<button class="btn sm danger" data-act="void" data-id="${s.id}">${A ? 'إلغاء' : 'Void'}</button>`}</td></tr>`).join('');
+  return `<div class="ahead"><div><h1>${esc(t('tSales'))}</h1><p>${A ? 'إلغاء أي طلب بيرجّع الكمية للمخزون وبيشيله من الحسابات' : 'Voiding returns the stock and removes it from totals'}</p></div><div class="actions">${exportBtns}</div></div>
+    <div class="toolbar">${dateBar()}</div>
+    <div class="card"><table class="tbl"><thead><tr><th>#</th><th>${A ? 'الوقت' : 'Time'}</th><th class="s">${A ? 'الأصناف' : 'Items'}</th><th>${A ? 'النوع' : 'Type'}</th><th>${A ? 'المبلغ' : 'Amount'}</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="6" style="height:80px;color:var(--muted)">${A ? 'ما في طلبات' : 'No orders'}</td></tr>`}</tbody></table></div>`;
+}
+async function voidSale(id) {
+  const A = S.lang === 'ar';
+  const sale = adminCache.sales.find((s) => s.id === id);
+  if (!sale || sale.voided || !confirm(A ? `إلغاء الطلب #${sale.no}؟ الكمية بترجع للمخزون.` : `Void order #${sale.no}?`)) return;
+  const items = JSON.parse(JSON.stringify(S.items));
+  sale.lines.forEach((l) => { if (items[l.id]) items[l.id].stock += l.qty; });
+  const upd = Object.assign({}, sale, { voided: true, voidedAt: Date.now(), syncedFlag: 0 });
+  await DB.tx(['kv', 'sales'], 'readwrite', (tx) => { tx.objectStore('kv').put({ cats: S.cats, groups: S.groups, items, seedVersion: SEED.version }, 'catalog'); tx.objectStore('sales').put(upd); });
+  S.items = items; Object.assign(sale, upd); S.pending++;
+  rerenderAdmin(); toast(A ? 'انلغى الطلب' : 'Order voided'); syncSoon();
+}
+function setRange(id) {
+  const d = new Date();
+  if (id === 'today') { S.admin.from = S.admin.to = dayOf(); }
+  if (id === 'week') { S.admin.to = dayOf(); d.setDate(d.getDate() - 6); S.admin.from = dayOf(d); }
+  if (id === 'month') { S.admin.to = dayOf(); S.admin.from = dayOf(new Date(d.getFullYear(), d.getMonth(), 1)); }
+  adminCache = null; rerenderAdmin();
+}
+
+/* ---------- Excel ---------- */
+function loadScript(src) { return new Promise((res, rej) => { if (window.XLSX) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('load')); document.head.appendChild(s); }); }
+async function exportExcel() {
+  const A = true; // the workbook is always in Arabic
+  await loadScript('vendor/xlsx.full.min.js');
+  const sales = (await DB.salesRange(S.admin.from, S.admin.to)).filter((s) => !s.voided).sort((a, b) => a.ts - b.ts);
+  const ag = aggregate(sales);
+  const r3 = (f) => Math.round(f) / 1000;
+  const payName = { cash: 'كاش', visa: 'فيزا', cliq: 'كليك' };
+  const summary = [
+    ['الفترة', S.admin.from === S.admin.to ? S.admin.from : `${S.admin.from} إلى ${S.admin.to}`],
+    ['عدد الطلبات', ag.orders], ['إجمالي المبيعات (د.أ)', r3(ag.rev)], ['تكلفة اللي انباع (د.أ)', r3(ag.cogs)],
+    ['الضيافة بسعر البيع (د.أ)', -r3(ag.hospSell)], ['الضيافة بالتكلفة (د.أ)', -r3(ag.hospCost)], ['صافي الربح (د.أ)', r3(ag.profit)],
+    [], ['كاش (د.أ)', r3(ag.byPay.cash || 0)], ['فيزا (د.أ)', r3(ag.byPay.visa || 0)], ['كليك (د.أ)', r3(ag.byPay.cliq || 0)],
+    [], ['الأكثر مبيعاً', Object.values(ag.byItem).sort((a, b) => b.qty - a.qty).slice(0, 5).map((o) => `${o.name} (${o.qty})`).join('، ')],
+  ];
+  const detail = [['التاريخ', 'الوقت', 'رقم الطلب', 'الصنف', 'الكمية', 'سعر الحبة', 'المجموع', 'النوع', 'طريقة الدفع', 'تكلفة الحبة', 'التكلفة', 'الربح']];
+  sales.forEach((s) => s.lines.forEach((l) => {
+    const h = s.type === 'hosp', tot = l.price * l.qty, c = (l.cost || 0) * l.qty;
+    detail.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : payName[s.pay], l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c)]);
+  }));
+  const items = [['الصنف', 'الكمية المباعة', 'الإيراد', 'التكلفة', 'الربح']];
+  Object.values(ag.byItem).sort((a, b) => b.rev - a.rev).forEach((o) => items.push([o.name, o.qty, r3(o.rev), r3(o.cost), r3(o.rev - o.cost)]));
+  const days = [['اليوم', 'الطلبات', 'المبيعات', 'كاش', 'فيزا', 'كليك', 'التكلفة', 'الضيافة (تكلفة)', 'صافي الربح']];
+  Object.values(ag.byDay).sort((a, b) => a.day.localeCompare(b.day)).forEach((d) => days.push([d.day, d.orders, r3(d.rev), r3(d.cash), r3(d.visa), r3(d.cliq), r3(d.cost), -r3(d.hospCost), r3(d.rev - d.cost - d.hospCost)]));
+  const hosp = [['التاريخ', 'الوقت', 'الصنف', 'الكمية', 'بسعر البيع', 'ملاحظة', 'التكلفة']];
+  ag.hosp.forEach((s) => s.lines.forEach((l) => hosp.push([s.day, timeOf(s.ts), l.nameAr || l.name, l.qty, -r3(l.price * l.qty), 'ضيافة', r3((l.cost || 0) * l.qty)])));
+  const stock = [['الصنف', 'التصنيف', 'الحالة', 'المخزون (حبة)', 'صناديق', 'حبات', 'حبات بالصندوق', 'سعر الصندوق', 'تكلفة الحبة', 'سعر البيع', 'ربح الحبة']];
+  S.groups.slice().sort((a, b) => a.order - b.order).forEach((g) => itemsOf(g.id).forEach((it) => {
+    const c = unitCost(it), cat = S.cats.find((x) => x.id === g.cat);
+    stock.push([it.ar ? `${g.ar} - ${it.ar}` : g.ar, cat ? cat.ar : '', isAvail(it) ? 'ON' : 'OFF', it.stock, it.units ? Math.floor(it.stock / it.units) : '', it.units ? it.stock % it.units : '', it.units || '', r3(it.box), c == null ? '' : r3(c), it.sell ? r3(it.sell) : '', it.sell && c != null ? r3(it.sell - c) : '']);
+  }));
+  const wb = XLSX.utils.book_new();
+  const add = (rows, name, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = widths.map((w) => ({ wch: w })); XLSX.utils.book_append_sheet(wb, ws, name); };
+  add(summary, 'الملخص العام', [28, 60]);
+  add(detail, 'المبيعات التفصيلية', [12, 8, 10, 32, 8, 10, 10, 8, 12, 10, 10, 10]);
+  add(items, 'ملخص الأصناف', [34, 14, 12, 12, 12]);
+  add(days, 'الملخص اليومي', [12, 10, 12, 10, 10, 10, 12, 14, 12]);
+  add(hosp, 'الضيافة', [12, 8, 32, 8, 12, 10, 10]);
+  add(stock, 'المخزون', [34, 16, 8, 12, 10, 8, 12, 12, 12, 10, 10]);
+  wb.Workbook = { Views: [{ RTL: true }] };
+  const name = `مبيعات-${S.admin.from}${S.admin.from === S.admin.to ? '' : '_' + S.admin.to}.xlsx`;
+  XLSX.writeFile(wb, name);
+  toast(S.lang === 'ar' ? 'تنزّل ملف Excel' : 'Excel downloaded');
+}
+
+/* ---------- Google Sheet sync (only part that needs internet; waits quietly) ---------- */
+let syncing = false, syncTimer;
+function syncSoon(ms = 1500) { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms); }
+async function syncNow(manual) {
+  if (syncing) return;
+  if (!S.settings.sheetUrl) { if (manual) toast(S.lang === 'ar' ? 'الشيت مش مربوط · اربطه من الإعدادات' : 'Link the sheet in Settings', true); return; }
+  if (!navigator.onLine) { if (manual) toast(S.lang === 'ar' ? 'ما في إنترنت · بيترفع لحاله لما يرجع' : 'Offline · will upload when online', true); return; }
+  const batch = (await DB.unsynced()).sort((a, b) => a.ts - b.ts).slice(0, 200);
+  if (!batch.length) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
+  syncing = true;
+  try {
+    const stock = S.groups.flatMap((g) => itemsOf(g.id).map((it) => ({ name: it.ar ? `${g.ar} - ${it.ar}` : g.ar, stock: it.stock, units: it.units || '', on: isAvail(it) ? 'ON' : 'OFF' })));
+    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', sales: batch, stock }) });
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'sheet');
+    await DB.tx(['sales'], 'readwrite', (tx) => { const st = tx.objectStore('sales'); batch.forEach((s) => st.put(Object.assign({}, s, { syncedFlag: 1 }))); });
+    S.settings.lastSync = Date.now(); await saveSettings();
+    S.pending = (await DB.unsynced()).length;
+    if (manual) toast(S.lang === 'ar' ? 'انرفع على الشيت' : 'Uploaded');
+    if (S.pending) syncSoon(500);
+  } catch (e) {
+    if (manual) toast((S.lang === 'ar' ? 'ما زبط الرفع، بنحاول بعدين: ' : 'Upload failed, will retry: ') + e.message, true);
+  } finally { syncing = false; refreshHeader(); }
+}
+function refreshHeader() { const h = $('header.top'); if (h) h.outerHTML = header(); }
+
+/* ---------- settings & backup ---------- */
+function settingsTab() {
+  const A = S.lang === 'ar';
+  const last = S.settings.lastSync ? new Date(S.settings.lastSync).toLocaleString(A ? 'ar-JO' : 'en-GB') : (A ? 'ولا مرة' : 'never');
+  let storage = '';
+  return `<div class="ahead"><div><h1>${esc(t('tSettings'))}</h1></div></div>
+  <div class="setgrid">
+    <div class="setcard"><h3>${A ? 'ربط Google Sheet' : 'Google Sheet link'}</h3>
+      <p>${A ? 'بعد ما تعمل الشيت حسب التعليمات، الصق الرابط هون. المبيعات بتترفع لحالها أول ما يكون في إنترنت، وإذا ما في بتستنى.' : 'Paste the web-app link. Sales upload automatically whenever there is internet.'}</p>
+      <div class="field"><label for="sUrl">${A ? 'رابط الشيت (Web app URL)' : 'Web app URL'}</label><input class="inp" id="sUrl" dir="ltr" value="${esc(S.settings.sheetUrl || '')}" placeholder="https://script.google.com/macros/s/.../exec"></div>
+      <div class="field"><label for="sKey">${A ? 'الرمز السري للشيت' : 'Sheet secret'}</label><input class="inp" id="sKey" dir="ltr" value="${esc(S.settings.sheetKey || '')}"></div>
+      <p>${A ? 'آخر رفع' : 'Last upload'}: ${esc(last)} · ${A ? 'بالانتظار' : 'pending'}: ${S.pending}</p>
+      <div class="actions"><button class="btn primary" data-act="saveSheet" style="flex:1">${A ? 'حفظ' : 'Save'}</button><button class="btn dark" data-act="syncNow" style="flex:1">${A ? 'ارفع هلأ' : 'Upload now'}</button></div></div>
+    <div class="setcard"><h3>${A ? 'كلمة سر الـ Admin' : 'Admin password'}</h3><p>${A ? 'أرقام بس، من 4 لـ 8. كلمة السر الأولى 1234، غيّرها.' : 'Digits only, 4 to 8. The first one is 1234; change it.'}</p>
+      <div class="field"><label for="pNew">${A ? 'كلمة السر الجديدة' : 'New password'}</label><input class="inp c num" id="pNew" type="password" inputmode="numeric" maxlength="8"></div>
+      <div class="field"><label for="pNew2">${A ? 'أعد كتابتها' : 'Repeat it'}</label><input class="inp c num" id="pNew2" type="password" inputmode="numeric" maxlength="8"></div>
+      <button class="btn primary" data-act="savePin">${A ? 'غيّر كلمة السر' : 'Change password'}</button></div>
+    <div class="setcard"><h3>${A ? 'نسخة احتياطية' : 'Backup'}</h3><p>${A ? 'نزّل ملف فيه كل شي: الأصناف والأسعار والمخزون وكل المبيعات. احفظه بمكان ثاني، وبترجّعه على أي جهاز.' : 'Download a file with everything. Restore it on any device.'}</p>
+      <div class="actions"><button class="btn dark" data-act="backup" style="flex:1">${A ? 'نزّل نسخة' : 'Download backup'}</button><label class="btn" style="flex:1">${A ? 'استرجاع نسخة' : 'Restore'}<input type="file" accept=".json,application/json" id="restoreIn" class="sr"></label></div></div>
+    <div class="setcard"><h3>${A ? 'التخزين على التابلت' : 'Storage on this tablet'}</h3><p id="storageInfo">${storage}</p>
+      <p>${A ? 'كل شي محفوظ على التابلت نفسه، والنظام بيشتغل بدون إنترنت. لا تمسح بيانات Chrome، ونزّل نسخة احتياطية كل أسبوع.' : 'Everything is stored on this tablet. Do not clear Chrome data; download a backup weekly.'}</p></div>
+  </div>`;
+}
+async function fillStorageInfo() {
+  const el = $('#storageInfo'); if (!el) return;
+  const A = S.lang === 'ar';
+  let persisted = false; try { persisted = navigator.storage && (await navigator.storage.persisted()); } catch (e) { /* */ }
+  const all = await DB.allSales();
+  el.textContent = `${A ? 'عدد العمليات المحفوظة' : 'Saved orders'}: ${all.length} · ${A ? 'حماية من المسح' : 'Protected storage'}: ${persisted ? (A ? 'مفعّلة' : 'on') : (A ? 'مش مفعّلة (ثبّت التطبيق على الشاشة)' : 'off (install the app)')}`;
+}
+async function backup() {
+  const data = { app: 'cafeteria-pos', at: new Date().toISOString(), catalog: catalogDoc(), settings: Object.assign({}, S.settings, { pin: undefined }), sales: await DB.allSales(), stocklog: (await DB.get('stocklog')) || [] };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `نسخة-احتياطية-${dayOf()}.json`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  S.settings.lastBackup = Date.now(); saveSettings();
+}
+async function restore(file) {
+  const A = S.lang === 'ar';
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app !== 'cafeteria-pos' || !data.catalog || !Array.isArray(data.sales)) throw new Error('file');
+    if (!confirm(A ? `استرجاع النسخة؟ فيها ${data.sales.length} عملية. البيانات الحالية بتنستبدل.` : 'Restore? Current data will be replaced.')) return;
+    await DB.tx(['kv', 'sales'], 'readwrite', (tx) => { tx.objectStore('kv').put(data.catalog, 'catalog'); tx.objectStore('kv').put(data.stocklog || [], 'stocklog'); const st = tx.objectStore('sales'); st.clear(); data.sales.forEach((s) => st.put(s)); });
+    location.reload();
+  } catch (e) { toast(A ? 'الملف مش نسخة احتياطية صحيحة' : 'Not a valid backup file', true); }
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act, id = el.dataset.id;
+  if (a === 'overlay') { if (e.target === el && S.modal?.kind !== 'pin') closeModal(); return; }
+  switch (a) {
+    case 'cat': S.cat = id; render(); $('#gridArea')?.scrollTo(0, 0); break;
+    case 'clearQ': S.q = ''; render(); break;
+    case 'tile': { const its = itemsOf(id); if (its.length === 1) addToCart(its[0].id); else flavorSheet(id); break; }
+    case 'addItem': addToCart(id); break;
+    case 'closeModal': closeModal(); break;
+    case 'inc': { const l = S.cart[+el.dataset.i]; const it = S.items[l.id]; if (l.qty >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock}` : `Only ${it.stock} left`, true); break; } l.qty++; S.given = null; rerenderCart(); break; }
+    case 'dec': { const i = +el.dataset.i; if (S.cart[i].qty > 1) S.cart[i].qty--; else S.cart.splice(i, 1); S.given = null; rerenderCart(); break; }
+    case 'clearCart': S.cart = []; S.given = null; rerenderCart(); break;
+    case 'pay': S.pay = id; S.given = null; rerenderCart(); break;
+    case 'given': S.given = +el.dataset.v; rerenderCart(); break;
+    case 'checkout':
+      if (S.pay === 'cash' && S.given != null && S.given < cartTotal()) { toast(t('lessThan'), true); break; }
+      saveSale('sale'); break;
+    case 'hosp': askPin(t('pinHosp'), () => saveSale('hosp')); break;
+    case 'pin': pinKey(el.dataset.k); break;
+    case 'lang': S.lang = S.lang === 'ar' ? 'en' : 'ar'; S.settings.lang = S.lang; saveSettings(); render(); break;
+    case 'openAdmin': askPin(t('pinAdmin'), () => { S.view = 'admin'; adminCache = null; render(); }); break;
+    case 'closeAdmin': S.view = 'sell'; render(); break;
+    case 'syncNow': syncNow(true); break;
+    case 'tab': S.admin.tab = id; adminCache = null; render(); if (id === 'settings') fillStorageInfo(); break;
+    case 'acat': S.admin.cat = id; rerenderAdmin(); break;
+    case 'toggle': {
+      const it = S.items[id];
+      if (it.stock <= 0) { toast(S.lang === 'ar' ? 'المخزون صفر · ضيف كمية ليصير ON' : 'Stock is zero · add stock first', true); break; }
+      if (!(it.sell > 0)) { toast(S.lang === 'ar' ? 'حط سعر بيع أول' : 'Set a price first', true); break; }
+      it.off = !it.off; await saveCatalog(); rerenderAdmin(); break;
+    }
+    case 'stock': stockModal(id, el.dataset.mode); break;
+    case 'qset': $('#qtyIn').value = el.dataset.v; break;
+    case 'stockOk': stockOk(); break;
+    case 'newItem': itemModal(null); break;
+    case 'editItem': itemModal(id); break;
+    case 'saveItem': saveItem(); break;
+    case 'delItem': delItem(); break;
+    case 'range': setRange(id); break;
+    case 'void': voidSale(id); break;
+    case 'excel': try { await exportExcel(); } catch (err) { toast('Excel: ' + err.message, true); } break;
+    case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = $('#sKey').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
+    case 'savePin': {
+      const a1 = $('#pNew').value, a2 = $('#pNew2').value;
+      if (!/^\d{4,8}$/.test(a1)) { toast(S.lang === 'ar' ? 'لازم 4 لـ 8 أرقام' : '4 to 8 digits', true); break; }
+      if (a1 !== a2) { toast(S.lang === 'ar' ? 'الكلمتين مش متطابقات' : 'They do not match', true); break; }
+      S.settings.pin = await sha(a1); await saveSettings(); $('#pNew').value = $('#pNew2').value = ''; toast(S.lang === 'ar' ? 'تغيّرت كلمة السر' : 'Password changed'); break;
+    }
+    case 'backup': backup(); break;
+  }
+});
+document.addEventListener('input', (e) => {
+  const k = e.target.dataset.in;
+  if (k === 'q') { S.q = e.target.value; rerenderGrid(); }
+  if (k === 'aq') { S.admin.q = e.target.value; rerenderAdmin(); }
+});
+document.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.dataset.chg) changeField(el.dataset.chg, el.dataset.id, el.value);
+  if (el.dataset.date) { S.admin[el.dataset.date] = el.value; if (S.admin.from > S.admin.to) S.admin.to = S.admin.from; adminCache = null; rerenderAdmin(); }
+  if (el.id === 'fImg' && el.files[0]) pickImage(el.files[0]);
+  if (el.id === 'restoreIn' && el.files[0]) restore(el.files[0]);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.dataset.chg) e.target.blur();
+  if (e.key === 'Enter' && e.target.id === 'qtyIn') stockOk();
+});
+window.addEventListener('online', () => { refreshHeader(); syncSoon(500); });
+window.addEventListener('offline', refreshHeader);
+setInterval(() => { if (S.pending && navigator.onLine) syncNow(); }, 60000);
+setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0; } }, 30000);
+
+/* ---------- start ---------- */
+(async function start() {
+  try {
+    await loadAll();
+    S.today = dayOf();
+    render();
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    syncSoon(3000);
+  } catch (e) {
+    document.body.innerHTML = `<div style="padding:40px;font-family:sans-serif"><h2>خطأ بالتشغيل</h2><p>${esc(e.message)}</p></div>`;
+  }
+})();
