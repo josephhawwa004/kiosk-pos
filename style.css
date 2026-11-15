@@ -225,3 +225,4 @@ main.admin{flex:1;min-width:0;padding:18px 20px 24px}
 .imgpick .thumb img{width:60px;height:60px}
 .line .info small{direction:ltr;text-align:right}
 [dir=ltr] .line .info small{text-align:left}
+.pinpad,.seg5{direction:ltr}
