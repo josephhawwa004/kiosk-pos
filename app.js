@@ -740,6 +740,8 @@ function settingsTab() {
       <button class="btn primary" data-act="savePin">${A ? 'غيّر كلمة السر' : 'Change password'}</button></div>
     <div class="setcard"><h3>${A ? 'نسخة احتياطية' : 'Backup'}</h3><p>${A ? 'نزّل ملف فيه كل شي: الأصناف والأسعار والمخزون وكل المبيعات. احفظه بمكان ثاني، وبترجّعه على أي جهاز.' : 'Download a file with everything. Restore it on any device.'}</p>
       <div class="actions"><button class="btn dark" data-act="backup" style="flex:1">${A ? 'نزّل نسخة' : 'Download backup'}</button><label class="btn" style="flex:1">${A ? 'استرجاع نسخة' : 'Restore'}<input type="file" accept=".json,application/json" id="restoreIn" class="sr"></label></div></div>
+    <div class="setcard"><h3>${A ? 'بداية جديدة' : 'Fresh start'}</h3><p>${A ? 'بيمسح كل المبيعات والضيافة وسجل الجرد، وبيصفّر المخزون. الأصناف والأسعار والصور وعدد الحبات بيضلوا زي ما هم. استخدمه بعد التجربة وقبل أول يوم شغل.' : 'Deletes all sales, hospitality and stock history, and sets stock to zero. Items, prices and photos stay.'}</p>
+      <button class="btn danger" data-act="freshStart">${A ? 'امسح بيانات التجربة' : 'Delete test data'}</button></div>
     <div class="setcard"><h3>${A ? 'التخزين على التابلت' : 'Storage on this tablet'}</h3><p id="storageInfo">${storage}</p>
       <p>${A ? 'كل شي محفوظ على التابلت نفسه، والنظام بيشتغل بدون إنترنت. لا تمسح بيانات Chrome، ونزّل نسخة احتياطية كل أسبوع.' : 'Everything is stored on this tablet. Do not clear Chrome data; download a backup weekly.'}</p></div>
   </div>`;
@@ -757,6 +759,18 @@ async function backup() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `نسخة-احتياطية-${dayOf()}.json`; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   S.settings.lastBackup = Date.now(); saveSettings();
+}
+async function freshStart() {
+  const A = S.lang === 'ar';
+  const n = (await DB.allSales()).length;
+  if (!confirm(A ? `رح ينمسح ${n} عملية بيع وضيافة، والمخزون بيصير صفر. الأصناف والأسعار بيضلوا. متأكد؟` : `Delete ${n} orders and set stock to zero?`)) return;
+  if (!confirm(A ? 'تأكيد أخير: ما في رجعة بعد المسح.' : 'Last check: this cannot be undone.')) return;
+  const items = JSON.parse(JSON.stringify(S.items));
+  Object.values(items).forEach((it) => { it.stock = 0; it.off = false; });
+  await DB.tx(['kv', 'sales'], 'readwrite', (tx) => { tx.objectStore('sales').clear(); tx.objectStore('kv').put([], 'stocklog'); tx.objectStore('kv').put({ cats: S.cats, groups: S.groups, items, seedVersion: SEED.version }, 'catalog'); });
+  S.items = items; S.dayCount = 0; S.pending = 0; S.cart = []; adminCache = null;
+  delete S.settings.lastSync; await saveSettings();
+  render(); toast(A ? 'صار النظام نظيف · بداية جديدة' : 'Clean start');
 }
 async function restore(file) {
   const A = S.lang === 'ar';
@@ -821,6 +835,7 @@ document.addEventListener('click', async (e) => {
       S.settings.pin = await sha(a1); await saveSettings(); $('#pNew').value = $('#pNew2').value = ''; toast(S.lang === 'ar' ? 'تغيّرت كلمة السر' : 'Password changed'); break;
     }
     case 'backup': backup(); break;
+    case 'freshStart': freshStart(); break;
   }
 });
 document.addEventListener('input', (e) => {
