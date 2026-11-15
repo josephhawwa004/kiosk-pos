@@ -25,7 +25,7 @@ const ICON = {
 /* ---------- language ---------- */
 const T = {
   ar: {
-    brand: 'Kiosk', pos: 'نقطة البيع', offline: 'بدون إنترنت · كل شي محفوظ', online: 'متصل · كل شي محفوظ',
+    brand: 'MEU Kiosk', pos: 'نقطة البيع', offline: 'بدون إنترنت · كل شي محفوظ', online: 'متصل · كل شي محفوظ',
     sheetOk: 'الشيت محدّث', sheetPending: (n) => `${n} عملية بانتظار رفع الشيت`, sheetOff: 'الشيت مش مربوط',
     all: 'الكل', items: (n) => `${n} صنف`, search: 'ابحث عن صنف...', results: 'نتائج البحث', noResults: 'ما في أصناف',
     flavors: (n) => `${n} نكهات`, unavailable: 'غير متوفر', noPrice: 'بدون سعر', from: 'من', jd: 'د.أ',
@@ -40,7 +40,7 @@ const T = {
     tBarista: 'الباريستا', tBaristaSub: 'قريباً', tSettings: 'الإعدادات', tSettingsSub: 'الشيت، كلمة السر، النسخ الاحتياطي',
   },
   en: {
-    brand: 'Kiosk', pos: 'Point of sale', offline: 'Offline · everything saved', online: 'Online · everything saved',
+    brand: 'MEU Kiosk', pos: 'Point of sale', offline: 'Offline · everything saved', online: 'Online · everything saved',
     sheetOk: 'Sheet up to date', sheetPending: (n) => `${n} waiting to upload`, sheetOff: 'Sheet not linked',
     all: 'All', items: (n) => `${n} items`, search: 'Search items...', results: 'Search results', noResults: 'No items found',
     flavors: (n) => `${n} flavours`, unavailable: 'Unavailable', noPrice: 'No price', from: 'from', jd: 'JD',

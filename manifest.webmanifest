@@ -1,6 +1,6 @@
 {
-  "name": "Kiosk",
-  "short_name": "Kiosk",
+  "name": "MEU Kiosk",
+  "short_name": "MEU Kiosk",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "./",
