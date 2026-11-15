@@ -19,6 +19,8 @@ const ICON = {
   check: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   sync: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>',
   cart: '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#8F8B82" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.2"/><circle cx="17" cy="20" r="1.2"/></svg>',
+  moon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+  sun: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
 };
 
@@ -146,6 +148,7 @@ function groupMatches(g, q) {
 /* ---------- render: shell ---------- */
 function render() {
   document.documentElement.lang = S.lang;
+  document.documentElement.dataset.theme = S.settings.theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dir = S.lang === 'ar' ? 'rtl' : 'ltr';
   const focus = rememberFocus();
   $('#app').innerHTML = header() + (S.view === 'sell' ? sellView() : adminView());
@@ -163,6 +166,7 @@ function header() {
     <div class="pill"><span class="dot ${on ? 'on' : ''}"></span><span>${esc(on ? t('online') : t('offline'))}</span></div>
     <button class="pill" data-act="syncNow" style="color:#D4D5DA">${ICON.sync}<span>${esc(sheet)}</span></button>
     <button class="hbtn" data-act="openSheet">${S.lang === 'ar' ? 'افتح الشيت' : 'Open sheet'}</button>
+    <button class="hbtn" data-act="theme" aria-label="${S.settings.theme === 'dark' ? 'Light mode' : 'Night mode'}">${S.settings.theme === 'dark' ? ICON.sun : ICON.moon}</button>
     <button class="hbtn" data-act="lang">${S.lang === 'ar' ? 'EN' : 'ع'}</button>
     ${S.view === 'sell'
       ? `<button class="hbtn" data-act="openAdmin">${ICON.lock}<span>Admin</span></button>`
@@ -806,6 +810,7 @@ document.addEventListener('click', async (e) => {
       saveSale('sale'); break;
     case 'hosp': askPin(t('pinHosp'), () => saveSale('hosp')); break;
     case 'pin': pinKey(el.dataset.k); break;
+    case 'theme': S.settings.theme = S.settings.theme === 'dark' ? 'light' : 'dark'; saveSettings(); render(); if (S.admin.tab === 'settings' && S.view === 'admin') fillStorageInfo(); break;
     case 'lang': S.lang = S.lang === 'ar' ? 'en' : 'ar'; S.settings.lang = S.lang; saveSettings(); render(); break;
     case 'openAdmin': askPin(t('pinAdmin'), () => { S.view = 'admin'; adminCache = null; render(); }); break;
     case 'closeAdmin': S.view = 'sell'; render(); break;

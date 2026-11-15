@@ -226,3 +226,41 @@ main.admin{flex:1;min-width:0;padding:18px 20px 24px}
 .line .info small{direction:ltr;text-align:right}
 [dir=ltr] .line .info small{text-align:left}
 .pinpad,.seg5{direction:ltr}
+
+/* ---------- night mode ---------- */
+html[data-theme=dark]{
+  --bg:#0F1013;--card:#1A1C21;--soft:#23262C;--line:#3A3D45;--line2:#2C2F36;--line3:#262930;
+  --muted:#A3A6AE;--acc-soft:#3A2116;--acc-line:#6B3A22;--acc-ink:#FFB48A;
+  --good:#4ADE80;--bad:#F87171;--warn:#FBBF24;
+}
+html[data-theme=dark] body{background:var(--bg);color:#EDEDEF}
+html[data-theme=dark] :is(.btn,.segbtn,.qty button,.pinpad button,.inp,.ti,.chip,.btn-ghost,.vbtn,.modal,.search,.cartcard,.tile,.kpi,.card,.setcard,.datebar input,.switch){background:var(--card);border-color:var(--line);color:#EDEDEF}
+html[data-theme=dark] .qty{border-color:var(--line)}
+html[data-theme=dark] .qty button:active,html[data-theme=dark] .pinpad button:active{background:var(--soft)}
+html[data-theme=dark] .cartfoot,html[data-theme=dark] .tbl tr.off td,html[data-theme=dark] .tbl .grp td{background:#16181C}
+html[data-theme=dark] .tbl th{background:var(--soft)}
+html[data-theme=dark] .tile .ph,html[data-theme=dark] .thumb{background:#F3F2EF;border-color:var(--line)}
+html[data-theme=dark] .tile.off{background:#15171B;color:var(--muted)}
+html[data-theme=dark] .tile.off .ph{background:#3A3D45}
+html[data-theme=dark] :is(.tile .pr,.vbtn .pr){background:var(--acc-soft);color:#FF9A5C}
+html[data-theme=dark] .tile.off .pr,html[data-theme=dark] .vbtn:disabled .pr{background:var(--line2);color:var(--muted)}
+html[data-theme=dark] .vbtn:disabled{background:#15171B;border-color:var(--line)}
+html[data-theme=dark] .segbtn.on,html[data-theme=dark] .chip.on,html[data-theme=dark] .btn.dark{background:#EDEDEF;border-color:#EDEDEF;color:#17181C}
+html[data-theme=dark] .seg5 .segbtn.on{background:var(--acc-soft);border-color:var(--acc);color:#FF9A5C}
+html[data-theme=dark] .btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+html[data-theme=dark] .btn:disabled{background:var(--line2);border-color:var(--line);color:var(--muted)}
+html[data-theme=dark] .btn.danger{border-color:#6B2C2C;color:#F87171}
+html[data-theme=dark] .switch.on{background:#EDEDEF;border-color:#EDEDEF;color:#17181C}
+html[data-theme=dark] .switch.on i{background:#17181C}
+html[data-theme=dark] .kpi.dark{background:var(--acc);border-color:var(--acc);color:#fff}
+html[data-theme=dark] .kpi.dark span,html[data-theme=dark] .kpi.dark small{color:#FFE6D5}
+html[data-theme=dark] .change,html[data-theme=dark] .drawer{background:#2E1C12;border-color:var(--acc-line);color:var(--acc-ink)}
+html[data-theme=dark] .empty b{color:#EDEDEF}
+html[data-theme=dark] .dots i{border-color:#EDEDEF}
+html[data-theme=dark] .dots i.f{background:#EDEDEF}
+html[data-theme=dark] .tag{background:var(--soft)}
+html[data-theme=dark] .tag.h{background:#3A1A1A;color:#FF8A8A}
+html[data-theme=dark] .bar .track{background:var(--line2)}
+html[data-theme=dark] .card h2,html[data-theme=dark] .carthead{border-color:var(--line2)}
+html[data-theme=dark] input::placeholder{color:#7C7F88}
+html[data-theme=dark] input[type=date]{color-scheme:dark}
