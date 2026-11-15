@@ -264,3 +264,70 @@ html[data-theme=dark] .bar .track{background:var(--line2)}
 html[data-theme=dark] .card h2,html[data-theme=dark] .carthead{border-color:var(--line2)}
 html[data-theme=dark] input::placeholder{color:#7C7F88}
 html[data-theme=dark] input[type=date]{color-scheme:dark}
+
+/* ================= FIRE look ================= */
+:root{--fire:linear-gradient(135deg,#FF8A00 0%,#FF4D00 50%,#E3121B 100%);--fireSolid:#FF4D00;--glow:0 6px 22px rgba(255,77,0,.45);--acc:#F2420A;--acc-soft:#FFE9DF;--acc-line:#FFB89A}
+body{font-weight:600}
+header.top{background:#0B0B0D;border-bottom:0;box-shadow:inset 0 -3px 0 0 #FF4D00;position:relative}
+header.top::after{content:'';position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--fire)}
+.brand .logo{background:var(--fire);box-shadow:var(--glow);width:44px;height:44px;border-radius:14px}
+.brand b{font-size:21px;font-weight:700;letter-spacing:.3px}
+nav.side{background:#0B0B0D}
+.sidebtn{background:#16171B;border:2px solid #2A2B31;border-radius:16px;min-height:70px}
+.sidebtn b{font-size:15px}
+.sidebtn.on{background:var(--fire);border-color:transparent;box-shadow:var(--glow);transform:scale(1.02)}
+.hbtn,.pill{border-width:2px}
+.tile{border:2px solid #1C1D21;border-radius:22px;min-height:206px;padding:10px;box-shadow:0 2px 0 #1C1D21}
+.tile .ph{border:0;border-radius:16px;height:110px;background:#F5F4F1}
+.tile .nm{font-size:16px;font-weight:700}
+.tile .pr{background:var(--fire);color:#fff;height:32px;padding:0 14px;border-radius:16px;font-size:15px;box-shadow:0 4px 12px rgba(255,77,0,.35)}
+.tile:active:not(:disabled){border-color:#FF4D00;box-shadow:var(--glow)}
+.tile.off{border-color:#CFCBC3;box-shadow:none}
+.tile.off .pr{background:#E2DFD8;color:#6B6E75;box-shadow:none}
+.badge{background:#0B0B0D;border:1.5px solid #FF4D00;color:#fff}
+.gridhead b{font-size:24px;font-weight:700}
+.search{border:2px solid #1C1D21;border-radius:16px}
+.cartcard{border:2px solid #1C1D21;border-radius:22px}
+.carthead{background:#0B0B0D;color:#fff;border-bottom:0}
+.carthead .btn-ghost{background:transparent;color:#D4D5DA;border-color:#3A3C44}
+.count{background:var(--fire)}
+.total b{font-size:36px;font-weight:700}
+.segbtn{border:2px solid #1C1D21;font-size:17px}
+.segbtn.on{background:#0B0B0D;border-color:#0B0B0D;color:#fff;box-shadow:inset 0 -4px 0 #FF4D00}
+.seg5 .segbtn{border-width:2px}
+.seg5 .segbtn.on{background:var(--fire);border-color:transparent;color:#fff}
+.change{background:#0B0B0D;border:0;color:#fff;height:52px}
+.change b{color:#FF7A3D;font-size:22px}
+.btn{border-width:2px}
+.btn.primary{background:var(--fire);border-color:transparent;box-shadow:var(--glow)}
+.btn.big{height:66px;font-size:21px;letter-spacing:.3px}
+.btn.hosp{height:66px;border-color:#1C1D21}
+.qty{border:2px solid #1C1D21}
+.thumb{border:2px solid #E6E3DC}
+.vbtn{border:2px solid #1C1D21}
+.vbtn .pr{background:var(--fire);color:#fff}
+.mhead{background:#0B0B0D;box-shadow:inset 0 -3px 0 #FF4D00}
+.pinpad button{border:2px solid #1C1D21}
+.pinpad [data-k=ok]{background:var(--fire)!important;border-color:transparent!important;box-shadow:var(--glow)}
+.kpi,.card,.setcard{border:2px solid #1C1D21}
+.kpi.dark{background:var(--fire);border-color:transparent;box-shadow:var(--glow)}
+.kpi.dark span,.kpi.dark small{color:#FFE6D5}
+.tbl th{background:#0B0B0D;color:#fff}
+.switch.on{background:var(--fire);border-color:transparent}
+.chip.on{background:var(--fire);border-color:transparent}
+.toast .ok{background:var(--fire)}
+.bar .fill{background:var(--fire)!important}
+.drawer{background:#0B0B0D;border:0;color:#fff}
+/* night */
+html[data-theme=dark] .tile{background:#141519;border-color:#2A2B31;box-shadow:none}
+html[data-theme=dark] .tile.off{background:#101114;border-color:#1E1F24}
+html[data-theme=dark] :is(.tile .pr,.vbtn .pr){background:var(--fire);color:#fff}
+html[data-theme=dark] :is(.search,.cartcard,.segbtn,.qty,.vbtn,.btn,.kpi,.card,.setcard,.pinpad button){border-color:#2A2B31}
+html[data-theme=dark] .segbtn.on{background:#FFFFFF;color:#0B0B0D;border-color:#fff;box-shadow:inset 0 -4px 0 #FF4D00}
+html[data-theme=dark] .seg5 .segbtn.on{background:var(--fire);color:#fff;border-color:transparent}
+html[data-theme=dark] .btn.primary{background:var(--fire);color:#fff}
+html[data-theme=dark] .change,html[data-theme=dark] .drawer{background:#000;border:2px solid #FF4D00;color:#fff}
+html[data-theme=dark] .kpi.dark{background:var(--fire)}
+html[data-theme=dark] .switch.on{background:var(--fire);color:#fff}
+html[data-theme=dark] .chip.on{background:var(--fire);color:#fff;border-color:transparent}
+html[data-theme=dark] .tbl th{background:#000}
