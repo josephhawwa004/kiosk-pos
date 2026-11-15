@@ -14,7 +14,8 @@ function doPost(e) {
       writeSummary(ss);
       tidy(ss);
     } finally { lock.releaseLock(); }
-    return out({ ok: true, n: (data.sales || []).length, url: ss.getUrl() });
+    const home = ss.getSheetByName('الملخص العام');
+    return out({ ok: true, n: (data.sales || []).length, url: ss.getUrl() + (home ? '#gid=' + home.getSheetId() : '') });
   } catch (err) { return out({ ok: false, error: String(err) }); }
 }
 function doGet() { return out({ ok: true, ping: true }); }
