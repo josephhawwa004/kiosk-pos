@@ -868,7 +868,7 @@ setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       const hadOld = !!navigator.serviceWorker.controller;
-      navigator.serviceWorker.register('sw.js').then((reg) => { setInterval(() => reg.update().catch(() => {}), 30 * 60000); }).catch(() => {});
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => { reg.update().catch(() => {}); setInterval(() => reg.update().catch(() => {}), 30 * 60000); }).catch(() => {});
       /* a new version was installed: switch to it as soon as the cashier is not in the middle of an order */
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!hadOld) return;
