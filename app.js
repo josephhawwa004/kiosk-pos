@@ -851,7 +851,16 @@ setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0
     S.today = dayOf();
     render();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-    if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      const hadOld = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.register('sw.js').then((reg) => { setInterval(() => reg.update().catch(() => {}), 30 * 60000); }).catch(() => {});
+      /* a new version was installed: switch to it as soon as the cashier is not in the middle of an order */
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadOld) return;
+        const tryReload = () => { if (!S.cart.length && !S.modal) location.reload(); else setTimeout(tryReload, 5000); };
+        tryReload();
+      });
+    }
     syncSoon(3000);
   } catch (e) {
     document.body.innerHTML = `<div style="padding:40px;font-family:sans-serif"><h2>خطأ بالتشغيل</h2><p>${esc(e.message)}</p></div>`;
