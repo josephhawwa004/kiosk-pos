@@ -162,6 +162,7 @@ function header() {
     <div class="grow"></div>
     <div class="pill"><span class="dot ${on ? 'on' : ''}"></span><span>${esc(on ? t('online') : t('offline'))}</span></div>
     <button class="pill" data-act="syncNow" style="color:#D4D5DA">${ICON.sync}<span>${esc(sheet)}</span></button>
+    <button class="hbtn" data-act="openSheet">${S.lang === 'ar' ? 'افتح الشيت' : 'Open sheet'}</button>
     <button class="hbtn" data-act="lang">${S.lang === 'ar' ? 'EN' : 'ع'}</button>
     ${S.view === 'sell'
       ? `<button class="hbtn" data-act="openAdmin">${ICON.lock}<span>Admin</span></button>`
@@ -526,7 +527,7 @@ function reportTab(kind) {
   if (!adminCache || adminCache.key !== key) { loadRange(); return `<div class="empty">...</div>`; }
   const A = S.lang === 'ar', ag = aggregate(adminCache.sales);
   const rangeTxt = S.admin.from === S.admin.to ? S.admin.from : `${S.admin.from} → ${S.admin.to}`;
-  const exportBtns = `<button class="btn" data-act="excel">${A ? 'تنزيل Excel' : 'Download Excel'}</button><button class="btn dark" data-act="syncNow">${A ? 'رفع على الشيت' : 'Upload to sheet'}</button>`;
+  const exportBtns = `<button class="btn primary" data-act="openSheet">${A ? 'افتح الشيت' : 'Open sheet'}</button><button class="btn dark" data-act="syncNow">${A ? 'رفع على الشيت' : 'Upload to sheet'}</button><button class="btn" data-act="excel">${A ? 'تنزيل Excel' : 'Download Excel'}</button>`;
   if (kind === 'eod') {
     const pays = ['cash', 'visa', 'cliq'], col = { cash: 'var(--acc)', visa: 'var(--ink)', cliq: '#7C7F88' };
     const bars = pays.map((p) => { const v = ag.byPay[p] || 0, pct = ag.rev ? Math.round((v / ag.rev) * 100) : 0; return `<div class="bar"><div class="t"><span>${esc(t(p))}</span><span class="num">${jd(v)} <small>· ${pct}%</small></span></div><div class="track"><div class="fill" style="width:${pct}%;background:${col[p]}"></div></div></div>`; }).join('');
@@ -700,6 +701,7 @@ async function syncNow(manual) {
     const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', sales: batch, stock }) });
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || 'sheet');
+    if (out.url && out.url !== S.settings.sheetView) { S.settings.sheetView = out.url; }
     await DB.tx(['sales'], 'readwrite', (tx) => { const st = tx.objectStore('sales'); batch.forEach((s) => st.put(Object.assign({}, s, { syncedFlag: 1 }))); });
     S.settings.lastSync = Date.now(); await saveSettings();
     S.pending = (await DB.unsynced()).length;
@@ -708,6 +710,13 @@ async function syncNow(manual) {
   } catch (e) {
     if (manual) toast((S.lang === 'ar' ? 'ما زبط الرفع، بنحاول بعدين: ' : 'Upload failed, will retry: ') + e.message, true);
   } finally { syncing = false; refreshHeader(); }
+}
+const DEFAULT_SHEET_VIEW = 'https://docs.google.com/spreadsheets/d/13u_SyXFSbmTGcsq9Vus5iYVEGtCP2aL0zLF2Up1vZyw/edit';
+function sheetViewUrl() { return S.settings.sheetView || DEFAULT_SHEET_VIEW; }
+function openSheet() {
+  if (!navigator.onLine) { toast(S.lang === 'ar' ? 'لازم إنترنت لفتح الشيت' : 'Internet needed to open the sheet', true); return; }
+  if (S.pending && S.settings.sheetUrl) syncNow();
+  window.open(sheetViewUrl(), '_blank', 'noopener');
 }
 function refreshHeader() { const h = $('header.top'); if (h) h.outerHTML = header(); }
 
@@ -722,6 +731,7 @@ function settingsTab() {
       <p>${A ? 'بعد ما تعمل الشيت حسب التعليمات، الصق الرابط هون. المبيعات بتترفع لحالها أول ما يكون في إنترنت، وإذا ما في بتستنى.' : 'Paste the web-app link. Sales upload automatically whenever there is internet.'}</p>
       <div class="field"><label for="sUrl">${A ? 'رابط الشيت (Web app URL)' : 'Web app URL'}</label><input class="inp" id="sUrl" dir="ltr" value="${esc(S.settings.sheetUrl || '')}" placeholder="https://script.google.com/macros/s/.../exec"></div>
       <div class="field"><label for="sKey">${A ? 'الرمز السري للشيت' : 'Sheet secret'}</label><input class="inp" id="sKey" dir="ltr" value="${esc(S.settings.sheetKey || '')}"></div>
+      <div class="field"><label for="sView">${A ? 'رابط فتح الشيت (docs.google.com)' : 'Sheet link to open (docs.google.com)'}</label><input class="inp" id="sView" dir="ltr" value="${esc(sheetViewUrl())}" placeholder="https://docs.google.com/spreadsheets/d/.../edit"></div>
       <p>${A ? 'آخر رفع' : 'Last upload'}: ${esc(last)} · ${A ? 'بالانتظار' : 'pending'}: ${S.pending}</p>
       <div class="actions"><button class="btn primary" data-act="saveSheet" style="flex:1">${A ? 'حفظ' : 'Save'}</button><button class="btn dark" data-act="syncNow" style="flex:1">${A ? 'ارفع هلأ' : 'Upload now'}</button></div></div>
     <div class="setcard"><h3>${A ? 'كلمة سر الـ Admin' : 'Admin password'}</h3><p>${A ? 'أرقام بس، من 4 لـ 8. كلمة السر الأولى 1234، غيّرها.' : 'Digits only, 4 to 8. The first one is 1234; change it.'}</p>
@@ -802,7 +812,8 @@ document.addEventListener('click', async (e) => {
     case 'range': setRange(id); break;
     case 'void': voidSale(id); break;
     case 'excel': try { await exportExcel(); } catch (err) { toast('Excel: ' + err.message, true); } break;
-    case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = $('#sKey').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
+    case 'openSheet': openSheet(); break;
+    case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = $('#sKey').value.trim(); S.settings.sheetView = $('#sView').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
     case 'savePin': {
       const a1 = $('#pNew').value, a2 = $('#pNew2').value;
       if (!/^\d{4,8}$/.test(a1)) { toast(S.lang === 'ar' ? 'لازم 4 لـ 8 أرقام' : '4 to 8 digits', true); break; }
