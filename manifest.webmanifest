@@ -1,6 +1,6 @@
 {
-  "name": "كافتيريا الجامعة - نقطة البيع",
-  "short_name": "الكافتيريا",
+  "name": "Kiosk",
+  "short_name": "Kiosk",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "./",
