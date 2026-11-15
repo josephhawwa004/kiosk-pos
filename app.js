@@ -302,15 +302,15 @@ function toast(msg, bad) {
   $('#toast').innerHTML = `<div class="toast ${bad ? 'bad' : ''}" role="status"><span class="ok">${bad ? ICON.x.replace('currentColor', '#fff') : ICON.check}</span><span>${esc(msg)}</span></div>`;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('#toast').innerHTML = ''; }, 2600);
 }
-function askPin(sub, onOk) {
-  S.modal = { kind: 'pin', val: '', sub, onOk, err: '' };
+function askPin(sub, onOk, code, title) {
+  S.modal = { kind: 'pin', val: '', sub, onOk, err: '', code, title };
   drawPin();
 }
 function drawPin() {
   const m = S.modal;
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
-  openModal(`<div class="modal narrow" role="dialog" aria-label="${esc(t('pinTitle'))}">
-    <div class="mhead"><div class="grow"><b>${esc(t('pinTitle'))}</b><small>${esc(m.sub)}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+  openModal(`<div class="modal narrow" role="dialog" aria-label="${esc(m.title || t('pinTitle'))}">
+    <div class="mhead"><div class="grow"><b>${esc(m.title || t('pinTitle'))}</b><small>${esc(m.sub)}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
     <div class="mbody"><div class="dots">${Array.from({ length: Math.max(4, m.val.length) }, (_, i) => `<i class="${i < m.val.length ? 'f' : ''}"></i>`).join('')}</div>
       <div class="err" style="text-align:center">${esc(m.err)}</div>
       <div class="pinpad">${keys.map((k) => `<button data-act="pin" data-k="${k}" ${k === 'ok' ? 'style="background:var(--acc);border-color:var(--acc);color:#fff;font-size:16px"' : ''}>${k === 'del' ? '⌫' : k === 'ok' ? esc(t('ok')) : k}</button>`).join('')}</div></div></div>`);
@@ -319,7 +319,7 @@ async function pinKey(k) {
   const m = S.modal; if (!m || m.kind !== 'pin') return;
   if (k === 'del') m.val = m.val.slice(0, -1);
   else if (k === 'ok') {
-    if ((await sha(m.val)) === S.settings.pin) { const cb = m.onOk; closeModal(); cb(); return; }
+    if (m.code ? m.val === m.code : (await sha(m.val)) === S.settings.pin) { const cb = m.onOk; closeModal(); cb(); return; }
     m.err = t('wrongPin'); m.val = '';
   } else if (m.val.length < 8) { m.val += k; m.err = ''; }
   drawPin();
@@ -725,7 +725,7 @@ function refreshHeader() { const h = $('header.top'); if (h) h.outerHTML = heade
 /* ---------- settings & backup ---------- */
 function settingsTab() {
   const A = S.lang === 'ar';
-  const last = S.settings.lastSync ? new Date(S.settings.lastSync).toLocaleString(A ? 'ar-JO' : 'en-GB') : (A ? 'ولا مرة' : 'never');
+  const last = S.settings.lastSync ? new Date(S.settings.lastSync).toLocaleString('en-GB') : (A ? 'ولا مرة' : 'never');
   let storage = '';
   return `<div class="ahead"><div><h1>${esc(t('tSettings'))}</h1></div></div>
   <div class="setgrid">
@@ -743,7 +743,7 @@ function settingsTab() {
     <div class="setcard"><h3>${A ? 'نسخة احتياطية' : 'Backup'}</h3><p>${A ? 'نزّل ملف فيه كل شي: الأصناف والأسعار والمخزون وكل المبيعات. احفظه بمكان ثاني، وبترجّعه على أي جهاز.' : 'Download a file with everything. Restore it on any device.'}</p>
       <div class="actions"><button class="btn dark" data-act="backup" style="flex:1">${A ? 'نزّل نسخة' : 'Download backup'}</button><label class="btn" style="flex:1">${A ? 'استرجاع نسخة' : 'Restore'}<input type="file" accept=".json,application/json" id="restoreIn" class="sr"></label></div></div>
     <div class="setcard"><h3>${A ? 'بداية جديدة' : 'Fresh start'}</h3><p>${A ? 'بيمسح كل المبيعات والضيافة وسجل الجرد، وبيصفّر المخزون. الأصناف والأسعار والصور وعدد الحبات بيضلوا زي ما هم. استخدمه بعد التجربة وقبل أول يوم شغل.' : 'Deletes all sales, hospitality and stock history, and sets stock to zero. Items, prices and photos stay.'}</p>
-      <button class="btn danger" data-act="freshStart">${A ? 'امسح بيانات التجربة' : 'Delete test data'}</button></div>
+      <button class="btn danger" data-act="freshStart">${ICON.lock}<span>${A ? 'امسح بيانات التجربة' : 'Delete test data'}</span></button></div>
     <div class="setcard"><h3>${A ? 'التخزين على التابلت' : 'Storage on this tablet'}</h3><p id="storageInfo">${storage}</p>
       <p>${A ? 'كل شي محفوظ على التابلت نفسه، والنظام بيشتغل بدون إنترنت. لا تمسح بيانات Chrome، ونزّل نسخة احتياطية كل أسبوع.' : 'Everything is stored on this tablet. Do not clear Chrome data; download a backup weekly.'}</p></div>
   </div>`;
@@ -766,7 +766,6 @@ async function freshStart() {
   const A = S.lang === 'ar';
   const n = (await DB.allSales()).length;
   if (!confirm(A ? `رح ينمسح ${n} عملية بيع وضيافة من النظام ومن الـ Google Sheet، والمخزون بيصير صفر. الأصناف والأسعار بيضلوا. متأكد؟` : `Delete ${n} orders here and in the Google Sheet, and set stock to zero?`)) return;
-  if (!confirm(A ? 'تأكيد أخير: ما في رجعة بعد المسح.' : 'Last check: this cannot be undone.')) return;
   const items = JSON.parse(JSON.stringify(S.items));
   Object.values(items).forEach((it) => { it.stock = 0; it.off = false; });
   await DB.tx(['kv', 'sales'], 'readwrite', (tx) => { tx.objectStore('sales').clear(); tx.objectStore('kv').put([], 'stocklog'); tx.objectStore('kv').put({ cats: S.cats, groups: S.groups, items, seedVersion: SEED.version }, 'catalog'); });
@@ -838,7 +837,7 @@ document.addEventListener('click', async (e) => {
       S.settings.pin = await sha(a1); await saveSettings(); $('#pNew').value = $('#pNew2').value = ''; toast(S.lang === 'ar' ? 'تغيّرت كلمة السر' : 'Password changed'); break;
     }
     case 'backup': backup(); break;
-    case 'freshStart': freshStart(); break;
+    case 'freshStart': askPin(S.lang === 'ar' ? 'لحماية البيانات من المسح بالغلط' : 'Protects your data from accidental deletion', freshStart, '0000', S.lang === 'ar' ? 'كلمة سر المسح' : 'Delete password'); break;
   }
 });
 document.addEventListener('input', (e) => {

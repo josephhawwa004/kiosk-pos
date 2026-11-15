@@ -21,7 +21,8 @@ button:disabled{cursor:not-allowed}
 .scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .scroll::-webkit-scrollbar{width:0;height:0}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-.num{font-variant-numeric:tabular-nums}
+.num{font-variant-numeric:tabular-nums;unicode-bidi:isolate}
+input.num,.ti,input[type=date]{direction:ltr}
 
 #app{height:100%;display:flex;flex-direction:column}
 header.top{height:68px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 18px;background:var(--ink);color:#fff;border-bottom:1px solid #2A2C33}
@@ -222,3 +223,5 @@ main.admin{flex:1;min-width:0;padding:18px 20px 24px}
 .imgpick{display:flex;align-items:center;gap:12px}
 .imgpick .thumb{width:72px;height:72px}
 .imgpick .thumb img{width:60px;height:60px}
+.line .info small{direction:ltr;text-align:right}
+[dir=ltr] .line .info small{text-align:left}
