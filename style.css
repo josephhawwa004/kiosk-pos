@@ -331,3 +331,10 @@ html[data-theme=dark] .kpi.dark{background:var(--fire)}
 html[data-theme=dark] .switch.on{background:var(--fire);color:#fff}
 html[data-theme=dark] .chip.on{background:var(--fire);color:#fff;border-color:transparent}
 html[data-theme=dark] .tbl th{background:#000}
+
+.nameinp{width:100%;min-width:120px;height:38px;border:2px solid transparent;border-radius:10px;background:transparent;padding:0 8px;font-size:15px;font-weight:700;color:inherit;outline:0}
+.nameinp{border-bottom:2px dashed var(--line)}
+.nameinp:hover{border-color:var(--line)}
+.nameinp:focus{border-color:#FF4D00;background:var(--card)}
+.grpname{max-width:340px;font-size:14px}
+.tbl .grp .namecell span{font-size:12px;color:var(--muted);white-space:nowrap}

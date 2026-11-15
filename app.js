@@ -368,14 +368,14 @@ function itemsTab() {
     if (S.admin.cat === 'need') its = its.filter((i) => !(i.sell > 0) || !(i.units > 0));
     if (S.admin.cat === 'low') its = its.filter((i) => i.stock <= lowLimit(i));
     if (!its.length) continue;
-    if (its.length > 1) rows += `<tr class="grp"><td colspan="8" class="s">${esc(L(g.ar, g.en))} · ${esc(t('flavors', its.length))}</td></tr>`;
+    if (its.length > 1) rows += `<tr class="grp"><td colspan="8" class="s"><div class="namecell"><input class="nameinp grpname" id="gname-${g.id}" value="${esc(g.ar)}" data-chg="gname" data-id="${g.id}" aria-label="group name"><span>${esc(t('flavors', its.length))}</span></div></td></tr>`;
     for (const it of its) {
       const c = unitCost(it), p = it.sell > 0 && c != null ? it.sell - c : null;
       const on = isAvail(it), st = it.stock;
       const bx = it.units > 0 ? `${Math.floor(st / it.units)} ${S.lang === 'ar' ? 'صندوق و' : 'box + '}${st % it.units} ${S.lang === 'ar' ? 'حبة' : 'pcs'}` : '';
       const stCls = st <= 0 ? 'zero' : st <= lowLimit(it) ? 'low' : '';
       rows += `<tr class="${on ? '' : 'off'}">
-        <td class="s"><div class="namecell"><div class="thumb"><img src="${esc(it.img)}" alt=""></div><div><b>${esc(it.ar || it.en ? L(it.ar, it.en) : L(g.ar, g.en))}</b><small>${esc(its.length > 1 ? L(g.ar, g.en) : L(S.cats.find((x) => x.id === g.cat)?.ar, S.cats.find((x) => x.id === g.cat)?.en))}</small></div>
+        <td class="s"><div class="namecell"><div class="thumb"><img src="${esc(it.img)}" alt=""></div><div class="grow"><input class="nameinp" id="vname-${it.id}" value="${esc(its.length > 1 ? (it.ar || '') : g.ar)}" data-chg="${its.length > 1 ? 'vname' : 'gname'}" data-id="${its.length > 1 ? it.id : g.id}" aria-label="name"><small>${esc(its.length > 1 ? L(g.ar, g.en) : L(S.cats.find((x) => x.id === g.cat)?.ar, S.cats.find((x) => x.id === g.cat)?.en))}</small></div>
           <button class="btn sm" data-act="editItem" data-id="${it.id}" style="margin-inline-start:auto">${S.lang === 'ar' ? 'تعديل' : 'Edit'}</button></div></td>
         <td><input class="ti num" id="box-${it.id}" inputmode="decimal" value="${jd(it.box)}" data-chg="box" data-id="${it.id}" aria-label="box price"></td>
         <td><input class="ti u num ${it.units > 0 ? '' : 'need'}" id="units-${it.id}" inputmode="numeric" value="${it.units > 0 ? it.units : ''}" placeholder="؟" data-chg="units" data-id="${it.id}" aria-label="pieces per box"></td>
@@ -399,6 +399,12 @@ function itemsTab() {
 }
 
 async function changeField(field, id, raw) {
+  if (field === 'gname' || field === 'vname') {
+    const v = raw.trim();
+    if (field === 'gname') { const g = S.groups.find((x) => x.id === id); if (!g) return; if (!v) { toast(S.lang === 'ar' ? 'الاسم ما بيصير يكون فاضي' : 'Name cannot be empty', true); rerenderAdmin(); return; } g.ar = v; }
+    else { const it = S.items[id]; if (!it) return; it.ar = v || null; }
+    await saveCatalog(); toast(S.lang === 'ar' ? 'انحفظ الاسم' : 'Name saved'); if (field === 'gname') rerenderAdmin(); return;
+  }
   const it = S.items[id]; if (!it) return;
   if (field === 'units') { const v = parseInt(raw, 10); it.units = isNaN(v) || v <= 0 ? null : v; }
   else {
