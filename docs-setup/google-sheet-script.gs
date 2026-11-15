@@ -8,6 +8,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const lock = LockService.getScriptLock(); lock.waitLock(25000);
     try {
+      if (data.reset) resetAll(ss);
       writeSales(ss, data.sales || []);
       writeStock(ss, data.stock || []);
       writeDaily(ss);
@@ -15,7 +16,7 @@ function doPost(e) {
       tidy(ss);
     } finally { lock.releaseLock(); }
     const home = ss.getSheetByName('الملخص العام');
-    return out({ ok: true, n: (data.sales || []).length, url: ss.getUrl() + (home ? '#gid=' + home.getSheetId() : '') });
+    return out({ ok: true, reset: !!data.reset, n: (data.sales || []).length, url: ss.getUrl() + (home ? '#gid=' + home.getSheetId() : '') });
   } catch (err) { return out({ ok: false, error: String(err) }); }
 }
 function doGet() { return out({ ok: true, ping: true }); }
@@ -140,6 +141,15 @@ function tidy(ss) {
   const y = ss.getSheetByName('الملخص اليومي'); if (y && y.getLastRow() > 1) styleSheet(y, 9, [3, 4, 5, 6, 7, 8, 9], [150, 110, 140, 130, 130, 130, 140, 170, 150], true);
   const def = ss.getSheetByName('Sheet1') || ss.getSheetByName('الورقة1');
   if (def && ss.getSheets().length > 1 && def.getLastRow() === 0) ss.deleteSheet(def);
+}
+
+/* fresh start from the app: empty every sheet the app writes */
+function resetAll(ss) {
+  ['المبيعات التفصيلية', 'المخزون', 'الملخص اليومي', 'الملخص العام'].forEach((n) => {
+    const sh = ss.getSheetByName(n); if (!sh) return;
+    sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).breakApart(); sh.clear(); sh.clearFormats();
+    sh.showColumns(1, sh.getMaxColumns());
+  });
 }
 
 /* run once by hand from the editor to re-format sheets that already exist */

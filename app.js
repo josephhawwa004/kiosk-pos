@@ -694,15 +694,17 @@ async function syncNow(manual) {
   if (!S.settings.sheetUrl) { if (manual) toast(S.lang === 'ar' ? 'الشيت مش مربوط · اربطه من الإعدادات' : 'Link the sheet in Settings', true); return; }
   if (!navigator.onLine) { if (manual) toast(S.lang === 'ar' ? 'ما في إنترنت · بيترفع لحاله لما يرجع' : 'Offline · will upload when online', true); return; }
   const batch = (await DB.unsynced()).sort((a, b) => a.ts - b.ts).slice(0, 200);
-  if (!batch.length) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
+  const reset = !!S.settings.pendingReset;
+  if (!batch.length && !reset) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
   syncing = true;
   try {
     const stock = S.groups.flatMap((g) => itemsOf(g.id).map((it) => ({ name: it.ar ? `${g.ar} - ${it.ar}` : g.ar, stock: it.stock, units: it.units || '', on: isAvail(it) ? 'ON' : 'OFF' })));
-    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', sales: batch, stock }) });
+    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', reset, sales: batch, stock }) });
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || 'sheet');
     if (out.url && out.url !== S.settings.sheetView) { S.settings.sheetView = out.url; }
     await DB.tx(['sales'], 'readwrite', (tx) => { const st = tx.objectStore('sales'); batch.forEach((s) => st.put(Object.assign({}, s, { syncedFlag: 1 }))); });
+    if (reset) { if (!out.reset) throw new Error(S.lang === 'ar' ? 'حدّث كود الشيت ليقدر يمسح' : 'update the sheet script to allow clearing'); S.settings.pendingReset = false; if (manual) toast(S.lang === 'ar' ? 'انمسح الشيت كمان' : 'Sheet cleared too'); }
     S.settings.lastSync = Date.now(); await saveSettings();
     S.pending = (await DB.unsynced()).length;
     if (manual) toast(S.lang === 'ar' ? 'انرفع على الشيت' : 'Uploaded');
@@ -763,14 +765,15 @@ async function backup() {
 async function freshStart() {
   const A = S.lang === 'ar';
   const n = (await DB.allSales()).length;
-  if (!confirm(A ? `رح ينمسح ${n} عملية بيع وضيافة، والمخزون بيصير صفر. الأصناف والأسعار بيضلوا. متأكد؟` : `Delete ${n} orders and set stock to zero?`)) return;
+  if (!confirm(A ? `رح ينمسح ${n} عملية بيع وضيافة من النظام ومن الـ Google Sheet، والمخزون بيصير صفر. الأصناف والأسعار بيضلوا. متأكد؟` : `Delete ${n} orders here and in the Google Sheet, and set stock to zero?`)) return;
   if (!confirm(A ? 'تأكيد أخير: ما في رجعة بعد المسح.' : 'Last check: this cannot be undone.')) return;
   const items = JSON.parse(JSON.stringify(S.items));
   Object.values(items).forEach((it) => { it.stock = 0; it.off = false; });
   await DB.tx(['kv', 'sales'], 'readwrite', (tx) => { tx.objectStore('sales').clear(); tx.objectStore('kv').put([], 'stocklog'); tx.objectStore('kv').put({ cats: S.cats, groups: S.groups, items, seedVersion: SEED.version }, 'catalog'); });
   S.items = items; S.dayCount = 0; S.pending = 0; S.cart = []; adminCache = null;
-  delete S.settings.lastSync; await saveSettings();
+  delete S.settings.lastSync; S.settings.pendingReset = !!S.settings.sheetUrl; await saveSettings();
   render(); toast(A ? 'صار النظام نظيف · بداية جديدة' : 'Clean start');
+  if (S.settings.pendingReset) syncNow(true);
 }
 async function restore(file) {
   const A = S.lang === 'ar';
