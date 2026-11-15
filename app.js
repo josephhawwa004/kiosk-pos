@@ -577,46 +577,111 @@ function setRange(id) {
 /* ---------- Excel ---------- */
 function loadScript(src) { return new Promise((res, rej) => { if (window.XLSX) return res(); const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('load')); document.head.appendChild(s); }); }
 async function exportExcel() {
-  const A = true; // the workbook is always in Arabic
-  await loadScript('vendor/xlsx.full.min.js');
+  await loadScript('vendor/xlsx-style.js');
   const sales = (await DB.salesRange(S.admin.from, S.admin.to)).filter((s) => !s.voided).sort((a, b) => a.ts - b.ts);
   const ag = aggregate(sales);
   const r3 = (f) => Math.round(f) / 1000;
   const payName = { cash: 'كاش', visa: 'فيزا', cliq: 'كليك' };
-  const summary = [
-    ['الفترة', S.admin.from === S.admin.to ? S.admin.from : `${S.admin.from} إلى ${S.admin.to}`],
-    ['عدد الطلبات', ag.orders], ['إجمالي المبيعات (د.أ)', r3(ag.rev)], ['تكلفة اللي انباع (د.أ)', r3(ag.cogs)],
-    ['الضيافة بسعر البيع (د.أ)', -r3(ag.hospSell)], ['الضيافة بالتكلفة (د.أ)', -r3(ag.hospCost)], ['صافي الربح (د.أ)', r3(ag.profit)],
-    [], ['كاش (د.أ)', r3(ag.byPay.cash || 0)], ['فيزا (د.أ)', r3(ag.byPay.visa || 0)], ['كليك (د.أ)', r3(ag.byPay.cliq || 0)],
-    [], ['الأكثر مبيعاً', Object.values(ag.byItem).sort((a, b) => b.qty - a.qty).slice(0, 5).map((o) => `${o.name} (${o.qty})`).join('، ')],
-  ];
-  const detail = [['التاريخ', 'الوقت', 'رقم الطلب', 'الصنف', 'الكمية', 'سعر الحبة', 'المجموع', 'النوع', 'طريقة الدفع', 'تكلفة الحبة', 'التكلفة', 'الربح']];
+  const period = S.admin.from === S.admin.to ? S.admin.from : `${S.admin.from} إلى ${S.admin.to}`;
+
+  /* look: every value in its own bordered cell, 18pt bold, right-to-left */
+  const B = { style: 'thin', color: { rgb: 'B9B5AC' } };
+  const BORDER = { top: B, bottom: B, left: B, right: B };
+  const AL = { horizontal: 'center', vertical: 'center', wrapText: true, readingOrder: 2 };
+  const ST = {
+    title: { font: { name: 'Arial', sz: 22, bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: 'C2410C' } }, alignment: AL, border: BORDER },
+    sub: { font: { name: 'Arial', sz: 16, bold: true, color: { rgb: '5F6168' } }, alignment: AL },
+    head: { font: { name: 'Arial', sz: 18, bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '17181C' } }, alignment: AL, border: BORDER },
+    cell: { font: { name: 'Arial', sz: 18, bold: true, color: { rgb: '17181C' } }, alignment: AL, border: BORDER },
+    zebra: { font: { name: 'Arial', sz: 18, bold: true, color: { rgb: '17181C' } }, fill: { fgColor: { rgb: 'F4F3F0' } }, alignment: AL, border: BORDER },
+    total: { font: { name: 'Arial', sz: 18, bold: true, color: { rgb: '8A2E07' } }, fill: { fgColor: { rgb: 'FFF1E8' } }, alignment: AL, border: BORDER },
+  };
+  const wb = XLSX.utils.book_new();
+  /* sheet = list of blocks; each block: {title, head, rows, money:[col idx], total:[row] } */
+  function sheet(name, blocks, widths) {
+    const ws = {}, merges = [], rowsH = [];
+    const ncol = widths.length;
+    let r = 0;
+    const put = (c, v, s, fmt) => {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      const cell = v === '' || v == null ? { t: 's', v: '' } : typeof v === 'number' ? { t: 'n', v } : { t: 's', v: String(v) };
+      const st = JSON.parse(JSON.stringify(s));
+      if (cell.t === 'n') { const f = fmt || '0'; cell.z = f; st.numFmt = f; }
+      cell.s = st; ws[ref] = cell;
+    };
+    const fullRow = (text, s, h, w = ncol) => { for (let c = 0; c < w; c++) put(c, c === 0 ? text : '', s); if (w > 1) merges.push({ s: { r, c: 0 }, e: { r, c: w - 1 } }); rowsH[r] = { hpt: h }; r++; };
+    fullRow(name, ST.title, 40);
+    fullRow('الفترة: ' + period, ST.sub, 30);
+    r++;
+    blocks.forEach((b, bi) => {
+      if (bi > 0) r++;
+      const w = b.head.filter((h) => h !== '').length;
+      const fmtOf = (c, i) => ((b.money || []).includes(c) && !(b.intRows || []).includes(i) ? '0.000' : '0');
+      if (b.title) fullRow(b.title, ST.head, 34, w);
+      b.head.slice(0, w).forEach((h, c) => put(c, h, ST.head)); rowsH[r] = { hpt: 32 }; r++;
+      if (!b.rows.length) { fullRow('لا يوجد بيانات', ST.cell, 30, w); }
+      b.rows.forEach((row, i) => {
+        row.slice(0, w).forEach((v, c) => put(c, v, i % 2 ? ST.zebra : ST.cell, fmtOf(c, i)));
+        rowsH[r] = { hpt: 30 }; r++;
+      });
+      if (b.total) { b.total.slice(0, w).forEach((v, c) => put(c, v, ST.total, fmtOf(c, -1))); rowsH[r] = { hpt: 32 }; r++; }
+    });
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r - 1, c: ncol - 1 } });
+    ws['!merges'] = merges; ws['!rows'] = rowsH; ws['!cols'] = widths.map((w) => ({ wch: w }));
+    ws['!views'] = [{ RTL: true }];
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  }
+  const sum = (rows, c) => rows.reduce((a, x) => a + (typeof x[c] === 'number' ? x[c] : 0), 0);
+
+  /* 1. summary */
+  const top = Object.values(ag.byItem).sort((a, b) => b.qty - a.qty).slice(0, 10).map((o) => [o.name, o.qty, r3(o.rev), r3(o.rev - o.cost)]);
+  const payRows = ['cash', 'visa', 'cliq'].map((p) => { const v = ag.byPay[p] || 0; return [payName[p], r3(v), ag.rev ? Math.round((v / ag.rev) * 100) + '%' : '0%', '']; });
+  sheet('الملخص العام', [
+    { title: 'الأرقام الرئيسية', head: ['البند', 'القيمة (د.أ)', '', ''], money: [1], intRows: [0], rows: [
+      ['عدد الطلبات', ag.orders, '', ''], ['إجمالي المبيعات', r3(ag.rev), '', ''], ['تكلفة اللي انباع', r3(ag.cogs), '', ''],
+      ['الضيافة بسعر البيع', -r3(ag.hospSell), '', ''], ['الضيافة بالتكلفة', -r3(ag.hospCost), '', '']], total: ['صافي الربح', r3(ag.profit), '', ''] },
+    { title: 'حسب طريقة الدفع', head: ['طريقة الدفع', 'المبلغ (د.أ)', 'النسبة', ''], money: [1], rows: payRows, total: ['المجموع', r3(ag.rev), '100%', ''] },
+    { title: 'الأكثر مبيعاً', head: ['الصنف', 'الكمية', 'الإيراد (د.أ)', 'الربح (د.أ)'], money: [2, 3], rows: top },
+  ], [36, 24, 22, 22]);
+
+  /* 2. detailed sales */
+  const det = [];
   sales.forEach((s) => s.lines.forEach((l) => {
     const h = s.type === 'hosp', tot = l.price * l.qty, c = (l.cost || 0) * l.qty;
-    detail.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : payName[s.pay], l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c)]);
+    det.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : payName[s.pay], l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c)]);
   }));
-  const items = [['الصنف', 'الكمية المباعة', 'الإيراد', 'التكلفة', 'الربح']];
-  Object.values(ag.byItem).sort((a, b) => b.rev - a.rev).forEach((o) => items.push([o.name, o.qty, r3(o.rev), r3(o.cost), r3(o.rev - o.cost)]));
-  const days = [['اليوم', 'الطلبات', 'المبيعات', 'كاش', 'فيزا', 'كليك', 'التكلفة', 'الضيافة (تكلفة)', 'صافي الربح']];
-  Object.values(ag.byDay).sort((a, b) => a.day.localeCompare(b.day)).forEach((d) => days.push([d.day, d.orders, r3(d.rev), r3(d.cash), r3(d.visa), r3(d.cliq), r3(d.cost), -r3(d.hospCost), r3(d.rev - d.cost - d.hospCost)]));
-  const hosp = [['التاريخ', 'الوقت', 'الصنف', 'الكمية', 'بسعر البيع', 'ملاحظة', 'التكلفة']];
+  sheet('المبيعات التفصيلية', [{ head: ['التاريخ', 'الوقت', 'رقم الطلب', 'الصنف', 'الكمية', 'سعر الحبة', 'المجموع', 'النوع', 'طريقة الدفع', 'تكلفة الحبة', 'التكلفة', 'الربح'],
+    money: [5, 6, 9, 10, 11], rows: det, total: ['المجموع', '', '', '', sum(det, 4), '', r3(Math.round(sum(det, 6) * 1000)), '', '', '', r3(Math.round(sum(det, 10) * 1000)), r3(Math.round(sum(det, 11) * 1000))] }],
+  [18, 12, 14, 40, 12, 16, 16, 14, 16, 16, 16, 16]);
+
+  /* 3. items */
+  const items = Object.values(ag.byItem).sort((a, b) => b.rev - a.rev).map((o) => [o.name, o.qty, r3(o.rev), r3(o.cost), r3(o.rev - o.cost)]);
+  sheet('ملخص الأصناف', [{ head: ['الصنف', 'الكمية المباعة', 'الإيراد (د.أ)', 'التكلفة (د.أ)', 'الربح (د.أ)'], money: [2, 3, 4], rows: items,
+    total: ['المجموع', sum(items, 1), r3(ag.rev), r3(ag.cogs), r3(ag.rev - ag.cogs)] }], [40, 20, 20, 20, 20]);
+
+  /* 4. daily */
+  const days = Object.values(ag.byDay).sort((a, b) => a.day.localeCompare(b.day)).map((d) => [d.day, d.orders, r3(d.rev), r3(d.cash), r3(d.visa), r3(d.cliq), r3(d.cost), -r3(d.hospCost), r3(d.rev - d.cost - d.hospCost)]);
+  sheet('الملخص اليومي', [{ head: ['اليوم', 'الطلبات', 'المبيعات', 'كاش', 'فيزا', 'كليك', 'التكلفة', 'الضيافة (تكلفة)', 'صافي الربح'], money: [2, 3, 4, 5, 6, 7, 8], rows: days,
+    total: ['المجموع', ag.orders, r3(ag.rev), r3(ag.byPay.cash || 0), r3(ag.byPay.visa || 0), r3(ag.byPay.cliq || 0), r3(ag.cogs), -r3(ag.hospCost), r3(ag.profit)] }],
+  [18, 14, 18, 16, 16, 16, 18, 20, 18]);
+
+  /* 5. hospitality */
+  const hosp = [];
   ag.hosp.forEach((s) => s.lines.forEach((l) => hosp.push([s.day, timeOf(s.ts), l.nameAr || l.name, l.qty, -r3(l.price * l.qty), 'ضيافة', r3((l.cost || 0) * l.qty)])));
-  const stock = [['الصنف', 'التصنيف', 'الحالة', 'المخزون (حبة)', 'صناديق', 'حبات', 'حبات بالصندوق', 'سعر الصندوق', 'تكلفة الحبة', 'سعر البيع', 'ربح الحبة']];
+  sheet('الضيافة', [{ head: ['التاريخ', 'الوقت', 'الصنف', 'الكمية', 'بسعر البيع (د.أ)', 'ملاحظة', 'التكلفة (د.أ)'], money: [4, 6], rows: hosp,
+    total: ['المجموع', '', '', sum(hosp, 3), -r3(ag.hospSell), '', r3(ag.hospCost)] }], [18, 12, 40, 12, 22, 14, 20]);
+
+  /* 6. stock */
+  const stock = [];
   S.groups.slice().sort((a, b) => a.order - b.order).forEach((g) => itemsOf(g.id).forEach((it) => {
     const c = unitCost(it), cat = S.cats.find((x) => x.id === g.cat);
     stock.push([it.ar ? `${g.ar} - ${it.ar}` : g.ar, cat ? cat.ar : '', isAvail(it) ? 'ON' : 'OFF', it.stock, it.units ? Math.floor(it.stock / it.units) : '', it.units ? it.stock % it.units : '', it.units || '', r3(it.box), c == null ? '' : r3(c), it.sell ? r3(it.sell) : '', it.sell && c != null ? r3(it.sell - c) : '']);
   }));
-  const wb = XLSX.utils.book_new();
-  const add = (rows, name, widths) => { const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = widths.map((w) => ({ wch: w })); XLSX.utils.book_append_sheet(wb, ws, name); };
-  add(summary, 'الملخص العام', [28, 60]);
-  add(detail, 'المبيعات التفصيلية', [12, 8, 10, 32, 8, 10, 10, 8, 12, 10, 10, 10]);
-  add(items, 'ملخص الأصناف', [34, 14, 12, 12, 12]);
-  add(days, 'الملخص اليومي', [12, 10, 12, 10, 10, 10, 12, 14, 12]);
-  add(hosp, 'الضيافة', [12, 8, 32, 8, 12, 10, 10]);
-  add(stock, 'المخزون', [34, 16, 8, 12, 10, 8, 12, 12, 12, 10, 10]);
+  sheet('المخزون', [{ head: ['الصنف', 'التصنيف', 'الحالة', 'المخزون (حبة)', 'صناديق', 'حبات', 'حبات بالصندوق', 'سعر الصندوق', 'تكلفة الحبة', 'سعر البيع', 'ربح الحبة'], money: [7, 8, 9, 10], rows: stock }],
+  [40, 22, 12, 18, 12, 12, 18, 18, 18, 16, 16]);
+
   wb.Workbook = { Views: [{ RTL: true }] };
-  const name = `مبيعات-${S.admin.from}${S.admin.from === S.admin.to ? '' : '_' + S.admin.to}.xlsx`;
-  XLSX.writeFile(wb, name);
+  XLSX.writeFile(wb, `مبيعات-${S.admin.from}${S.admin.from === S.admin.to ? '' : '_' + S.admin.to}.xlsx`);
   toast(S.lang === 'ar' ? 'تنزّل ملف Excel' : 'Excel downloaded');
 }
 
