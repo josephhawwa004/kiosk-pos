@@ -143,7 +143,9 @@ const itemsOf = (gid) => Object.values(S.items).filter((i) => i.groupId === gid)
 const itemName = (it) => { const g = groupOf(it); const gn = g ? L(g.ar, g.en) : ''; const vn = L(it.ar, it.en); return vn ? `${gn} - ${vn}` : gn; };
 const unitCost = (it) => (it.units > 0 && it.box != null ? it.box / it.units : null);
 const isAvail = (it) => !it.off && it.stock > 0 && it.sell > 0;
-const lowLimit = (it) => (it.units > 0 ? Math.max(1, Math.ceil(it.units / 2)) : 5);
+const lowBoxes = () => (S.settings.lowBoxes > 0 ? S.settings.lowBoxes : 2);
+const lowLimit = (it) => (it.units > 0 ? it.units * lowBoxes() : 10 * lowBoxes());
+const lowItems = () => Object.values(S.items).filter((i) => !i.off && i.sell > 0 && i.stock > 0 && i.stock <= lowLimit(i));
 function groupMatches(g, q) {
   if (!q) return true;
   const hay = [g.ar, g.en, ...itemsOf(g.id).flatMap((i) => [i.ar, i.en])].filter(Boolean).join(' ').toLowerCase();
@@ -174,7 +176,7 @@ function header() {
     <button class="hbtn" data-act="theme" aria-label="${S.settings.theme === 'dark' ? 'Light mode' : 'Night mode'}">${S.settings.theme === 'dark' ? ICON.sun : ICON.moon}</button>
     <button class="hbtn" data-act="lang">${S.lang === 'ar' ? 'EN' : 'ع'}</button>
     ${S.view === 'sell'
-      ? `<button class="hbtn" data-act="openAdmin">${ICON.lock}<span>Admin</span></button>`
+      ? `<button class="hbtn" data-act="openAdmin">${ICON.lock}<span>Admin</span>${lowItems().length ? `<span class="lowdot num" title="low stock">${lowItems().length}</span>` : ''}</button>`
       : `<button class="hbtn" data-act="closeAdmin">${ICON.back}<span>${esc(t('back'))}</span></button>`}
   </header>`;
 }
@@ -296,9 +298,14 @@ async function saveSale(type) {
       tx.objectStore('sales').put(sale);
     });
   } catch (e) { toast((S.lang === 'ar' ? 'ما انحفظت العملية: ' : 'Not saved: ') + e.message, true); return; }
+  const crossed = lines.filter((l) => { const before = S.items[l.id].stock, after = items[l.id].stock, lim = lowLimit(items[l.id]); return before > lim && after <= lim; }).map((l) => l.name);
+  const empty = lines.filter((l) => S.items[l.id].stock > 0 && items[l.id].stock <= 0).map((l) => l.name);
   S.items = items; S.dayCount++; S.pending++;
   S.cart = []; S.given = null;
   toast(type === 'hosp' ? t('hospDone', jd(total)) : t('sold', jd(total), t(sale.pay)));
+  if (empty.length || crossed.length) setTimeout(() => toast(empty.length
+    ? (S.lang === 'ar' ? `خلص: ${empty.join('، ')}` : `Sold out: ${empty.join(', ')}`)
+    : (S.lang === 'ar' ? `تنبيه: ضايل ${lowBoxes()} كرتونة أو أقل من ${crossed.join('، ')}` : `Low stock: ${crossed.join(', ')}`), true, 6000), 2700);
   render();
   syncSoon();
 }
@@ -307,9 +314,9 @@ async function saveSale(type) {
 function openModal(html) { $('#modal').innerHTML = `<div class="overlay" data-act="overlay">${html}</div>`; }
 function closeModal() { $('#modal').innerHTML = ''; S.modal = null; }
 let toastTimer;
-function toast(msg, bad) {
+function toast(msg, bad, ms) {
   $('#toast').innerHTML = `<div class="toast ${bad ? 'bad' : ''}" role="status"><span class="ok">${bad ? ICON.x.replace('currentColor', '#fff') : ICON.check}</span><span>${esc(msg)}</span></div>`;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('#toast').innerHTML = ''; }, 2600);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('#toast').innerHTML = ''; }, ms || 2600);
 }
 function askPin(sub, onOk, code, title) {
   S.modal = { kind: 'pin', val: '', sub, onOk, err: '', code, title };
@@ -357,7 +364,7 @@ const rerenderAdmin = () => { const m = $('#adminMain'); if (!m) return; const f
 function itemsTab() {
   const q = S.admin.q.trim();
   const all = Object.values(S.items);
-  const onN = all.filter(isAvail).length, lowN = all.filter((i) => isAvail(i) && i.stock <= lowLimit(i)).length;
+  const onN = all.filter(isAvail).length, lowN = lowItems().length;
   const needN = all.filter((i) => !(i.sell > 0) || !(i.units > 0)).length;
   const chips = [{ id: 'all', ar: 'الكل', en: 'All' }, ...S.cats, { id: 'need', ar: 'ناقصها معلومات', en: 'Missing info' }, { id: 'low', ar: 'قربت تخلص', en: 'Low stock' }]
     .map((c) => `<button class="chip ${S.admin.cat === c.id ? 'on' : ''}" data-act="acat" data-id="${c.id}">${esc(L(c.ar, c.en))}</button>`).join('');
@@ -366,7 +373,7 @@ function itemsTab() {
   for (const g of gs) {
     let its = itemsOf(g.id);
     if (S.admin.cat === 'need') its = its.filter((i) => !(i.sell > 0) || !(i.units > 0));
-    if (S.admin.cat === 'low') its = its.filter((i) => i.stock <= lowLimit(i));
+    if (S.admin.cat === 'low') its = its.filter((i) => i.stock > 0 && i.stock <= lowLimit(i));
     if (!its.length) continue;
     if (its.length > 1) rows += `<tr class="grp"><td colspan="8" class="s"><div class="namecell"><input class="nameinp grpname" id="gname-${g.id}" value="${esc(g.ar)}" data-chg="gname" data-id="${g.id}" aria-label="group name"><span>${esc(t('flavors', its.length))}</span></div></td></tr>`;
     for (const it of its) {
@@ -391,7 +398,7 @@ function itemsTab() {
   return `<div class="ahead"><div><h1>${esc(t('tItems'))}</h1><p>${S.lang === 'ar' ? 'عدّل سعر الصندوق، عدد الحبات، تكلفة الحبة أو سعر البيع، والباقي بيتحدّث لحاله. السعر الجديد بيمشي على المبيعات الجاية بس.' : 'Edit box price, pieces, unit cost or selling price; the rest updates. New prices apply to future sales only.'}</p></div>
       <button class="btn primary" data-act="newItem">+ ${S.lang === 'ar' ? 'صنف جديد' : 'New item'}</button></div>
     <div class="kpis k3"><div class="kpi"><span>${S.lang === 'ar' ? 'أصناف ON' : 'Items ON'}</span><b class="num">${onN}</b></div>
-      <div class="kpi"><span>${S.lang === 'ar' ? 'قربت تخلص' : 'Low stock'}</span><b class="num low">${lowN}</b></div>
+      <button class="kpi lowkpi" data-act="acat" data-id="low"><span>${S.lang === 'ar' ? `قربت تخلص (${lowBoxes()} كرتونة أو أقل)` : `Low stock (${lowBoxes()} boxes or less)`}</span><b class="num low">${lowN}</b></button>
       <div class="kpi"><span>${S.lang === 'ar' ? 'ناقصها سعر بيع أو عدد حبات' : 'Missing price or pieces'}</span><b class="num" style="color:var(--acc)">${needN}</b></div></div>
     <div class="toolbar"><label class="search">${ICON.search}<input id="aq" type="search" placeholder="${esc(t('search'))}" value="${esc(S.admin.q)}" data-in="aq"></label><div class="chips">${chips}</div></div>
     <div class="card"><table class="tbl"><thead><tr><th class="s" style="width:28%">${S.lang === 'ar' ? 'الصنف' : 'Item'}</th><th>${S.lang === 'ar' ? 'سعر الصندوق' : 'Box price'}</th><th>${S.lang === 'ar' ? 'حبات' : 'Pcs'}</th><th>${S.lang === 'ar' ? 'تكلفة الحبة' : 'Unit cost'}</th><th>${S.lang === 'ar' ? 'سعر البيع' : 'Price'}</th><th>${S.lang === 'ar' ? 'ربح الحبة' : 'Profit'}</th><th>${S.lang === 'ar' ? 'المخزون' : 'Stock'}</th><th>ON / OFF</th></tr></thead><tbody>${rows || `<tr><td colspan="8" style="height:120px;color:var(--muted)">${esc(t('noResults'))}</td></tr>`}</tbody></table></div>
@@ -755,6 +762,9 @@ function settingsTab() {
       <div class="field"><label for="pNew">${A ? 'كلمة السر الجديدة' : 'New password'}</label><input class="inp c num" id="pNew" type="password" inputmode="numeric" maxlength="8"></div>
       <div class="field"><label for="pNew2">${A ? 'أعد كتابتها' : 'Repeat it'}</label><input class="inp c num" id="pNew2" type="password" inputmode="numeric" maxlength="8"></div>
       <button class="btn primary" data-act="savePin">${A ? 'غيّر كلمة السر' : 'Change password'}</button></div>
+    <div class="setcard"><h3>${A ? 'تنبيه المخزون' : 'Low stock alert'}</h3><p>${A ? 'النظام بينبهك لما يضل من الصنف هالعدد من الكراتين أو أقل: بعد البيعة مباشرة، وبرقم أحمر على زر Admin، وبفلتر "قربت تخلص".' : 'Alert when this many boxes or fewer are left.'}</p>
+      <div class="field"><label for="lowB">${A ? 'نبّهني لما يضل (كرتونة)' : 'Alert at (boxes)'}</label><input class="inp c num" id="lowB" type="number" inputmode="numeric" min="1" max="20" value="${lowBoxes()}"></div>
+      <button class="btn primary" data-act="saveLow">${A ? 'حفظ' : 'Save'}</button></div>
     <div class="setcard"><h3>${A ? 'نسخة احتياطية' : 'Backup'}</h3><p>${A ? 'نزّل ملف فيه كل شي: الأصناف والأسعار والمخزون وكل المبيعات. احفظه بمكان ثاني، وبترجّعه على أي جهاز.' : 'Download a file with everything. Restore it on any device.'}</p>
       <div class="actions"><button class="btn dark" data-act="backup" style="flex:1">${A ? 'نزّل نسخة' : 'Download backup'}</button><label class="btn" style="flex:1">${A ? 'استرجاع نسخة' : 'Restore'}<input type="file" accept=".json,application/json" id="restoreIn" class="sr"></label></div></div>
     <div class="setcard"><h3>${A ? 'بداية جديدة' : 'Fresh start'}</h3><p>${A ? 'بيمسح كل المبيعات والضيافة وسجل الجرد، وبيصفّر المخزون. الأصناف والأسعار والصور وعدد الحبات بيضلوا زي ما هم. استخدمه بعد التجربة وقبل أول يوم شغل.' : 'Deletes all sales, hospitality and stock history, and sets stock to zero. Items, prices and photos stay.'}</p>
@@ -853,6 +863,7 @@ document.addEventListener('click', async (e) => {
       S.settings.pin = await sha(a1); await saveSettings(); $('#pNew').value = $('#pNew2').value = ''; toast(S.lang === 'ar' ? 'تغيّرت كلمة السر' : 'Password changed'); break;
     }
     case 'backup': backup(); break;
+    case 'saveLow': { const n = parseInt($('#lowB').value, 10); if (!(n >= 1 && n <= 20)) { toast(S.lang === 'ar' ? 'رقم من 1 لـ 20' : '1 to 20', true); break; } S.settings.lowBoxes = n; await saveSettings(); refreshHeader(); toast(S.lang === 'ar' ? `انحفظ: التنبيه لما يضل ${n} كرتونة` : 'Saved'); break; }
     case 'freshStart': askPin(S.lang === 'ar' ? 'لحماية البيانات من المسح بالغلط' : 'Protects your data from accidental deletion', freshStart, '0000', S.lang === 'ar' ? 'كلمة سر المسح' : 'Delete password'); break;
   }
 });
