@@ -154,3 +154,18 @@ function resetAll(ss) {
 
 /* run once by hand from the editor to re-format sheets that already exist */
 function formatNow() { const ss = SpreadsheetApp.getActiveSpreadsheet(); writeDaily(ss); writeSummary(ss); tidy(ss); }
+
+/* keeps today's summary current even when no sale came in */
+function refreshSummary() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const lock = LockService.getScriptLock(); if (!lock.tryLock(20000)) return;
+  try { if (ss.getSheetByName('المبيعات التفصيلية')) { writeDaily(ss); writeSummary(ss); tidy(ss); } } finally { lock.releaseLock(); }
+}
+/* runs by itself every time the sheet is opened */
+function onOpen() { refreshSummary(); }
+/* run ONCE by hand: refreshes every hour and just after midnight, day and night */
+function setupAutoRefresh() {
+  ScriptApp.getProjectTriggers().filter((t) => t.getHandlerFunction() === 'refreshSummary').forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('refreshSummary').timeBased().everyHours(1).create();
+  ScriptApp.newTrigger('refreshSummary').timeBased().atHour(0).nearMinute(5).everyDays(1).inTimezone(TZ).create();
+}
