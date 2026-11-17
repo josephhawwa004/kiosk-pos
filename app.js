@@ -923,3 +923,4 @@ setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0
     document.body.innerHTML = `<div style="padding:40px;font-family:sans-serif"><h2>خطأ بالتشغيل</h2><p>${esc(e.message)}</p></div>`;
   }
 })();
+/* catalog v3 */
