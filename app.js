@@ -312,6 +312,25 @@ function flavorSheet(gid) {
     <div class="mbody scroll"><div class="vgrid">${btns}</div></div></div>`);
 }
 
+/* ---------- checkout sound (stored with the app, so it plays offline) ---------- */
+const SND = { ctx: null, buf: null };
+async function loadSound() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    SND.ctx = new AC();
+    const r = await fetch('sounds/cash.mp3'); SND.buf = await SND.ctx.decodeAudioData(await r.arrayBuffer());
+  } catch (e) { /* no sound is fine */ }
+}
+function playCash(force) {
+  if (!force && S.settings.sound === false) return;
+  try {
+    if (!SND.ctx || !SND.buf) return;
+    if (SND.ctx.state === 'suspended') SND.ctx.resume();
+    const s = SND.ctx.createBufferSource(); s.buffer = SND.buf; s.connect(SND.ctx.destination); s.start();
+  } catch (e) { /* ignore */ }
+}
+document.addEventListener('pointerdown', () => { if (SND.ctx && SND.ctx.state === 'suspended') SND.ctx.resume(); }, true);
+
 /* ---------- saving sales (one atomic write: sale + stock) ---------- */
 async function saveSale(type, who) {
   if (!S.cart.length) return;
@@ -341,6 +360,7 @@ async function saveSale(type, who) {
   const empty = lines.filter((l) => S.items[l.id].stock > 0 && items[l.id].stock <= 0).map((l) => l.name);
   S.items = items; S.dayCount++; S.pending++;
   S.cart = []; S.given = null; S.disc = null;
+  if (type === 'sale') playCash();
   toast(type === 'hosp' ? t('hospDone', jd(total)) : t('sold', jd(total), t(sale.pay)));
   if (empty.length || crossed.length) setTimeout(() => toast(empty.length
     ? (S.lang === 'ar' ? `خلص: ${empty.join('، ')}` : `Sold out: ${empty.join(', ')}`)
@@ -811,7 +831,9 @@ ${ADMINS.map((d) => `    <div class="setcard"><h3>${A ? 'كلمة سر' : 'Passw
       <div class="field"><label for="pNew-${d.id}">${A ? 'كلمة السر الجديدة' : 'New password'}</label><input class="inp c num" id="pNew-${d.id}" type="password" inputmode="numeric" maxlength="8"></div>
       <div class="field"><label for="pNew2-${d.id}">${A ? 'أعد كتابتها' : 'Repeat it'}</label><input class="inp c num" id="pNew2-${d.id}" type="password" inputmode="numeric" maxlength="8"></div>
       <button class="btn primary" data-act="savePin" data-id="${d.id}">${A ? `غيّر كلمة سر ${d.ar}` : `Change ${d.en}'s password`}</button></div>
-`).join('')}    <div class="setcard"><h3>${A ? 'تنبيه المخزون' : 'Low stock alert'}</h3><p>${A ? 'النظام بينبهك لما يضل من الصنف هالعدد من الكراتين أو أقل: بعد البيعة مباشرة، وبرقم أحمر على زر Admin، وبفلتر "قربت تخلص".' : 'Alert when this many boxes or fewer are left.'}</p>
+`).join('')}    <div class="setcard"><h3>${A ? 'صوت إتمام البيع' : 'Checkout sound'}</h3><p>${A ? 'صوت "كا-تشينغ" بيطلع مع كل بيعة. بيشتغل بدون نت.' : 'A cha-ching plays after every sale. Works offline.'}</p>
+      <div class="actions"><button class="btn ${S.settings.sound === false ? '' : 'primary'}" data-act="toggleSound" style="flex:1">${S.settings.sound === false ? (A ? 'الصوت: OFF' : 'Sound: OFF') : (A ? 'الصوت: ON' : 'Sound: ON')}</button><button class="btn dark" data-act="testSound" style="flex:1">${A ? 'جرّب الصوت' : 'Play it'}</button></div></div>
+    <div class="setcard"><h3>${A ? 'تنبيه المخزون' : 'Low stock alert'}</h3><p>${A ? 'النظام بينبهك لما يضل من الصنف هالعدد من الكراتين أو أقل: بعد البيعة مباشرة، وبرقم أحمر على زر Admin، وبفلتر "قربت تخلص".' : 'Alert when this many boxes or fewer are left.'}</p>
       <div class="field"><label for="lowB">${A ? 'نبّهني لما يضل (كرتونة)' : 'Alert at (boxes)'}</label><input class="inp c num" id="lowB" type="number" inputmode="numeric" min="1" max="20" value="${lowBoxes()}"></div>
       <button class="btn primary" data-act="saveLow">${A ? 'حفظ' : 'Save'}</button></div>
     <div class="setcard"><h3>${A ? 'نسخة احتياطية' : 'Backup'}</h3><p>${A ? 'نزّل ملف فيه كل شي: الأصناف والأسعار والمخزون وكل المبيعات. احفظه بمكان ثاني، وبترجّعه على أي جهاز.' : 'Download a file with everything. Restore it on any device.'}</p>
@@ -906,6 +928,8 @@ document.addEventListener('click', async (e) => {
     case 'void': voidSale(id); break;
     case 'excel': try { await exportExcel(); } catch (err) { toast('Excel: ' + err.message, true); } break;
     case 'openSheet': openSheet(); break;
+    case 'toggleSound': S.settings.sound = S.settings.sound === false; await saveSettings(); render(); if (S.settings.sound) playCash(); break;
+    case 'testSound': playCash(true); break;
     case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = $('#sKey').value.trim(); S.settings.sheetView = $('#sView').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
     case 'savePin': {
       const id = el.dataset.id, who = ADMINS.find((d) => d.id === id), other = ADMINS.find((d) => d.id !== id);
@@ -949,6 +973,7 @@ setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0
     await loadAll();
     S.today = dayOf();
     render();
+    loadSound();
     setTimeout(() => { if (navigator.onLine) syncNow(); }, 3000);
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
