@@ -110,7 +110,7 @@ function seedCatalog() {
   SEED.groups.forEach((g, gi) => {
     groups.push({ id: g.id, ar: g.ar, en: g.en, cat: g.cat, order: gi });
     g.variants.forEach((v, vi) => {
-      items[v.id] = { id: v.id, groupId: g.id, ar: v.ar, en: v.en, img: v.img, box: Math.round(v.boxPrice * 1000), units: v.units, sell: null, stock: 0, off: false, sku: v.sku, order: vi };
+      items[v.id] = { id: v.id, groupId: g.id, ar: v.ar, en: v.en, img: v.img, box: v.boxPrice == null ? null : Math.round(v.boxPrice * 1000), units: v.units, sell: null, stock: 0, off: false, sku: v.sku, order: vi };
     });
   });
   return { cats: SEED.cats, groups, items, seedVersion: SEED.version };
@@ -124,6 +124,19 @@ async function loadAll() {
     const g = cat.groups.find((x) => x.id === 'raisins');
     if (g) { g.cat = 'drinks'; g.ar = 'الرافدين زبيب العنب'; g.en = 'Al Rafidain Raisin Drink'; }
     cat.seedVersion = 2; await DB.set('catalog', cat);
+  }
+  if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
+    const fresh = seedCatalog();
+    fresh.groups.forEach((g) => {
+      const have = cat.groups.find((x) => x.id === g.id);
+      if (have) have.order = g.order; else cat.groups.push(g);
+    });
+    Object.values(fresh.items).forEach((it) => {
+      const have = cat.items[it.id];
+      if (!have) cat.items[it.id] = it;
+      else { have.order = it.order; if (have.ar == null && it.ar) { have.ar = it.ar; have.en = it.en; } }
+    });
+    cat.seedVersion = SEED.version; await DB.set('catalog', cat);
   }
   S.cats = cat.cats; S.groups = cat.groups; S.items = cat.items;
   S.settings = (await DB.get('settings')) || {};
