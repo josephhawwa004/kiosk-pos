@@ -125,6 +125,12 @@ async function loadAll() {
     if (g) { g.cat = 'drinks'; g.ar = 'الرافدين زبيب العنب'; g.en = 'Al Rafidain Raisin Drink'; }
     cat.seedVersion = 2; await DB.set('catalog', cat);
   }
+  if (cat.seedVersion < 4) { /* v4: water gets its own section, right under "All" */
+    const custom = cat.cats.filter((c) => !SEED.cats.some((x) => x.id === c.id));
+    cat.cats = [...SEED.cats, ...custom];
+    const g = cat.groups.find((x) => x.id === 'berrywater');
+    if (g) g.cat = 'water';
+  }
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
@@ -923,4 +929,3 @@ setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0
     document.body.innerHTML = `<div style="padding:40px;font-family:sans-serif"><h2>خطأ بالتشغيل</h2><p>${esc(e.message)}</p></div>`;
   }
 })();
-/* catalog v3 */
