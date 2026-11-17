@@ -342,3 +342,16 @@ html[data-theme=dark] .tbl th{background:#000}
 .hbtn{position:relative}
 .lowdot{position:absolute;top:-8px;inset-inline-start:-8px;min-width:24px;height:24px;padding:0 6px;border-radius:12px;background:#E3121B;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #0B0B0D}
 button.kpi{text-align:start;cursor:pointer;font:inherit;color:inherit}
+/* discount */
+.discrow{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;font-weight:600;color:var(--muted);margin-bottom:-6px}
+.discrow.d{color:#E3121B;font-weight:700}
+.discrow .xbtn{width:28px;height:28px;border-radius:8px;border:1.5px solid currentColor;background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer;padding:0;margin-inline-start:auto}
+.discrow .xbtn svg{width:14px;height:14px}
+.discrow.d span:first-child{flex:1}
+.btn.hosp.disc.on{border-color:#E3121B;color:#E3121B}
+.tag.d{background:#FDE7E7;color:#B40F17}
+html[data-theme=dark] .tag.d{background:#3A1416;color:#FF8A8A}
+.cartfoot .actions .btn.hosp{width:86px;flex:none;flex-direction:column;gap:2px;font-size:14px;padding:0 4px;line-height:1.1}
+.cartfoot .actions .btn.hosp svg{width:15px;height:15px}
+.cartfoot .actions .btn.big{min-width:0}
+.discrow .num{direction:ltr}

@@ -35,7 +35,7 @@ const T = {
     total: 'المجموع', cash: 'كاش', visa: 'فيزا', cliq: 'كليك', received: 'المبلغ المستلم من الزبون', exact: 'بالضبط',
     change: 'الباقي للزبون', short: 'المبلغ ناقص', hosp: 'ضيافة', checkout: 'إتمام البيع', pickFlavor: 'اختار النكهة', soldOut: 'خلصت',
     sold: (t, p) => `تم البيع · ${t} د.أ · ${p}`, hospDone: (t) => `تمت الضيافة · ${t} د.أ`, lessThan: 'المبلغ المستلم أقل من المجموع',
-    pinTitle: 'كلمة سر الـ Admin', pinHosp: 'مطلوبة للضيافة', pinAdmin: 'للدخول على الـ Admin', wrongPin: 'كلمة السر غلط', ok: 'تأكيد', cancel: 'إلغاء',
+    pinTitle: 'كلمة سر الأدمن', pinHosp: 'مطلوبة للضيافة', pinDisc: 'مطلوبة للخصم', disc: 'خصم', sub: 'قبل الخصم', pinAdmin: 'للدخول على الـ Admin', wrongPin: 'كلمة السر غلط', ok: 'تأكيد', cancel: 'إلغاء',
     back: 'رجوع لشاشة البيع',
     tItems: 'الأصناف والمخزون', tItemsSub: 'أسعار، كميات، ON / OFF', tEod: 'End of Day', tEodSub: 'المبيعات والربح',
     tSales: 'سجل المبيعات', tSalesSub: 'كل الطلبات وإلغاؤها', tHosp: 'الضيافة', tHospSub: 'كل عمليات الضيافة',
@@ -50,7 +50,7 @@ const T = {
     total: 'Total', cash: 'Cash', visa: 'Visa', cliq: 'CliQ', received: 'Amount received', exact: 'Exact',
     change: 'Change', short: 'Not enough', hosp: 'Hospitality', checkout: 'Complete sale', pickFlavor: 'Pick a flavour', soldOut: 'Sold out',
     sold: (t, p) => `Sold · ${t} JD · ${p}`, hospDone: (t) => `Hospitality saved · ${t} JD`, lessThan: 'Received amount is less than the total',
-    pinTitle: 'Admin password', pinHosp: 'Required for hospitality', pinAdmin: 'To open Admin', wrongPin: 'Wrong password', ok: 'Confirm', cancel: 'Cancel',
+    pinTitle: 'Admin password', pinHosp: 'Required for hospitality', pinDisc: 'Required for the discount', disc: 'Discount', sub: 'Before discount', pinAdmin: 'To open Admin', wrongPin: 'Wrong password', ok: 'Confirm', cancel: 'Cancel',
     back: 'Back to sales',
     tItems: 'Items & stock', tItemsSub: 'Prices, stock, ON / OFF', tEod: 'End of Day', tEodSub: 'Sales and profit',
     tSales: 'Sales log', tSalesSub: 'All orders, void', tHosp: 'Hospitality', tHospSub: 'All hospitality',
@@ -147,6 +147,7 @@ async function loadAll() {
   S.cats = cat.cats; S.groups = cat.groups; S.items = cat.items;
   S.settings = (await DB.get('settings')) || {};
   if (!S.settings.pin) { S.settings.pin = await sha('1234'); S.settings.lang = 'ar'; await DB.set('settings', S.settings); }
+  if (!S.settings.pins) { S.settings.pins = { anas: await sha('1111'), lawrence: await sha('2222') }; await DB.set('settings', S.settings); }
   S.lang = S.settings.lang || 'ar';
   const today = await DB.salesRange(dayOf(), dayOf());
   S.dayCount = today.length;
@@ -242,8 +243,16 @@ function gridHtml() {
   }).join('');
   return head + `<div class="grid">${tiles}</div>`;
 }
-const cartTotal = () => S.cart.reduce((a, l) => a + l.price * l.qty, 0);
+/* two admins; each one's password opens Admin, hospitality and the discount */
+const ADMINS = [{ id: 'anas', ar: 'أنس', en: 'Anas' }, { id: 'lawrence', ar: 'لورنس', en: 'Lawrence' }];
+const DISC_PCT = 30;
+const cartSub = () => S.cart.reduce((a, l) => a + l.price * l.qty, 0);
+const cartDisc = () => (S.disc && S.cart.length ? Math.round(cartSub() * S.disc.pct / 100) : 0);
+const cartTotal = () => cartSub() - cartDisc();
+const lineNet = (l) => (l.net != null ? l.net : l.price * l.qty);
+const adminName = (ar) => { const x = ADMINS.find((d) => d.ar === ar); return x ? L(x.ar, x.en) : ar; };
 function cartHtml() {
+  if (!S.cart.length) S.disc = null;
   const total = cartTotal(), empty = !S.cart.length, count = S.cart.reduce((a, l) => a + l.qty, 0);
   const lines = empty
     ? `<div class="empty"><div class="ring">${ICON.cart}</div><b>${esc(t('emptyCart'))}</b><span>${esc(t('emptyHint'))}</span></div>`
@@ -267,9 +276,12 @@ function cartHtml() {
     <div class="carthead"><div><b>${esc(t('order'))}</b>${empty ? '' : `<span class="count num">${count}</span>`}</div>${empty ? '' : `<button class="btn-ghost" data-act="clearCart">${esc(t('clear'))}</button>`}</div>
     <div class="lines scroll">${lines}</div>
     <div class="cartfoot">
+      ${S.disc ? `<div class="discrow"><span>${esc(t('sub'))}</span><span class="num">${jd(cartSub())}</span></div>
+      <div class="discrow d"><span>${esc(t('disc'))} ${S.disc.pct}% · ${esc(adminName(S.disc.by))}</span><span class="num">-${jd(cartDisc())}</span><button class="xbtn" data-act="rmDisc" aria-label="remove discount">${ICON.x}</button></div>` : ''}
       <div class="total"><span>${esc(t('total'))}</span><b class="num">${jd(total)} <small>${esc(t('jd'))}</small></b></div>
       <div class="seg seg3" role="group">${pays}</div>${cash}
       <div class="actions"><button class="btn hosp" data-act="hosp" ${empty ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('hosp'))}</span></button>
+        <button class="btn hosp disc ${S.disc ? 'on' : ''}" data-act="disc" ${empty || S.disc ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('disc'))} <span class="num">${DISC_PCT}%</span></span></button>
         <button class="btn primary big" data-act="checkout" ${empty ? 'disabled' : ''}>${esc(t('checkout'))}</button></div>
     </div></div>`;
 }
@@ -301,14 +313,22 @@ function flavorSheet(gid) {
 }
 
 /* ---------- saving sales (one atomic write: sale + stock) ---------- */
-async function saveSale(type) {
+async function saveSale(type, who) {
   if (!S.cart.length) return;
   for (const l of S.cart) { const it = S.items[l.id]; if (!it || it.stock < l.qty) { toast(S.lang === 'ar' ? 'المخزون ما بيكفي' : 'Not enough stock', true); return; } }
   const now = Date.now();
   const lines = S.cart.map((l) => { const it = S.items[l.id]; const c = unitCost(it); return { id: l.id, name: itemName(it), nameAr: (() => { const g = groupOf(it); return it.ar ? `${g.ar} - ${it.ar}` : g.ar; })(), qty: l.qty, price: l.price, cost: c == null ? null : Math.round(c * 1000) / 1000 }; });
-  const total = lines.reduce((a, l) => a + l.price * l.qty, 0);
+  const sub = lines.reduce((a, l) => a + l.price * l.qty, 0);
+  const disc = type === 'sale' && S.disc ? Math.round(sub * S.disc.pct / 100) : 0;
+  if (disc) { /* spread the discount over the lines so item reports add up to the real total */
+    let left = sub - disc;
+    lines.forEach((l, i) => { l.net = i === lines.length - 1 ? left : Math.round(l.price * l.qty * (sub - disc) / sub); left -= i === lines.length - 1 ? 0 : l.net; });
+  }
+  const total = sub - disc;
   const cost = lines.reduce((a, l) => a + (l.cost || 0) * l.qty, 0);
   const sale = { id: now.toString(36) + '-' + Math.random().toString(36).slice(2, 6), ts: now, day: dayOf(new Date(now)), no: S.dayCount + 1, type, pay: type === 'sale' ? S.pay : null, given: type === 'sale' && S.pay === 'cash' ? S.given : null, lines, total, cost, voided: false, syncedFlag: 0 };
+  if (disc) Object.assign(sale, { sub, disc, discPct: S.disc.pct, by: S.disc.by });
+  if (type === 'hosp' && who) sale.by = who;
   const items = JSON.parse(JSON.stringify(S.items));
   for (const l of lines) items[l.id].stock -= l.qty;
   try {
@@ -320,7 +340,7 @@ async function saveSale(type) {
   const crossed = lines.filter((l) => { const before = S.items[l.id].stock, after = items[l.id].stock, lim = lowLimit(items[l.id]); return before > lim && after <= lim; }).map((l) => l.name);
   const empty = lines.filter((l) => S.items[l.id].stock > 0 && items[l.id].stock <= 0).map((l) => l.name);
   S.items = items; S.dayCount++; S.pending++;
-  S.cart = []; S.given = null;
+  S.cart = []; S.given = null; S.disc = null;
   toast(type === 'hosp' ? t('hospDone', jd(total)) : t('sold', jd(total), t(sale.pay)));
   if (empty.length || crossed.length) setTimeout(() => toast(empty.length
     ? (S.lang === 'ar' ? `خلص: ${empty.join('، ')}` : `Sold out: ${empty.join(', ')}`)
@@ -354,7 +374,8 @@ async function pinKey(k) {
   const m = S.modal; if (!m || m.kind !== 'pin') return;
   if (k === 'del') m.val = m.val.slice(0, -1);
   else if (k === 'ok') {
-    if (m.code ? m.val === m.code : (await sha(m.val)) === S.settings.pin) { const cb = m.onOk; closeModal(); cb(); return; }
+    if (m.code) { if (m.val === m.code) { const cb = m.onOk; closeModal(); cb(); return; } }
+    else { const h = await sha(m.val), who = ADMINS.find((d) => (S.settings.pins || {})[d.id] === h); if (who) { const cb = m.onOk; closeModal(); cb(who.ar); return; } }
     m.err = t('wrongPin'); m.val = '';
   } else if (m.val.length < 8) { m.val += k; m.err = ''; }
   drawPin();
@@ -553,10 +574,11 @@ function aggregate(sales) {
   const hospSell = hosp.reduce((a, s) => a + s.total, 0), hospCost = hosp.reduce((a, s) => a + s.cost, 0);
   const byPay = { cash: 0, visa: 0, cliq: 0 }; sold.forEach((s) => { byPay[s.pay] = (byPay[s.pay] || 0) + s.total; });
   const byItem = {};
-  sold.forEach((s) => s.lines.forEach((l) => { const k = l.id; const o = byItem[k] || (byItem[k] = { name: l.name, qty: 0, rev: 0, cost: 0 }); o.qty += l.qty; o.rev += l.price * l.qty; o.cost += (l.cost || 0) * l.qty; }));
+  sold.forEach((s) => s.lines.forEach((l) => { const k = l.id; const o = byItem[k] || (byItem[k] = { name: l.name, qty: 0, rev: 0, cost: 0 }); o.qty += l.qty; o.rev += lineNet(l); o.cost += (l.cost || 0) * l.qty; }));
   const byDay = {};
   live.forEach((s) => { const o = byDay[s.day] || (byDay[s.day] = { day: s.day, orders: 0, rev: 0, cost: 0, hospSell: 0, hospCost: 0, cash: 0, visa: 0, cliq: 0 }); if (s.type === 'sale') { o.orders++; o.rev += s.total; o.cost += s.cost; o[s.pay] += s.total; } else { o.hospSell += s.total; o.hospCost += s.cost; } });
-  return { sold, hosp, rev, cogs, hospSell, hospCost, profit: rev - cogs - hospCost, byPay, byItem, byDay, orders: sold.length };
+  const disc = sold.reduce((a, s) => a + (s.disc || 0), 0), discN = sold.filter((s) => s.disc).length;
+  return { sold, hosp, rev, cogs, hospSell, hospCost, profit: rev - cogs - hospCost, byPay, byItem, byDay, orders: sold.length, disc, discN };
 }
 function dateBar() {
   const A = S.lang === 'ar';
@@ -576,7 +598,7 @@ function reportTab(kind) {
     const trs = top.map((o) => `<tr><td class="s">${esc(o.name)}</td><td class="num">${o.qty}</td><td class="num">${jd(o.rev)}</td><td class="num">${jd(o.cost)}</td><td class="num pos">${jd(o.rev - o.cost)}</td></tr>`).join('');
     return `<div class="ahead"><div><h1>End of Day</h1><p>${esc(rangeTxt)}</p></div><div class="actions">${exportBtns}</div></div>
       <div class="toolbar">${dateBar()}</div>
-      <div class="kpis"><div class="kpi dark"><span>${A ? 'إجمالي المبيعات' : 'Total sales'}</span><b class="num">${jd(ag.rev)}</b><small>${ag.orders} ${A ? 'طلب' : 'orders'} · ${esc(t('jd'))}</small></div>
+      <div class="kpis"><div class="kpi dark"><span>${A ? 'إجمالي المبيعات' : 'Total sales'}</span><b class="num">${jd(ag.rev)}</b><small>${ag.orders} ${A ? 'طلب' : 'orders'} · ${esc(t('jd'))}${ag.disc ? ` · ${A ? 'خصومات' : 'discounts'} -${jd(ag.disc)} (${ag.discN})` : ''}</small></div>
         <div class="kpi"><span>${A ? 'تكلفة اللي انباع' : 'Cost of goods'}</span><b class="num">${jd(ag.cogs)}</b><small>${esc(t('jd'))}</small></div>
         <div class="kpi"><span>${A ? 'الضيافة (بالتكلفة)' : 'Hospitality (cost)'}</span><b class="num neg">-${jd(ag.hospCost)}</b><small>${A ? 'بسعر البيع' : 'at price'}: -${jd(ag.hospSell)}</small></div>
         <div class="kpi"><span>${A ? 'صافي الربح' : 'Net profit'}</span><b class="num ${ag.profit >= 0 ? 'pos' : 'neg'}">${jd(ag.profit)}</b><small>${esc(t('jd'))}</small></div></div>
@@ -584,14 +606,14 @@ function reportTab(kind) {
         <div class="card"><h2>${A ? 'الأصناف المباعة' : 'Items sold'}</h2><div class="scroll" style="max-height:360px"><table class="tbl"><thead><tr><th class="s">${A ? 'الصنف' : 'Item'}</th><th>${A ? 'الكمية' : 'Qty'}</th><th>${A ? 'الإيراد' : 'Revenue'}</th><th>${A ? 'التكلفة' : 'Cost'}</th><th>${A ? 'الربح' : 'Profit'}</th></tr></thead><tbody>${trs || `<tr><td colspan="5" style="height:80px;color:var(--muted)">${A ? 'ما في مبيعات' : 'No sales'}</td></tr>`}</tbody></table></div></div></div>`;
   }
   if (kind === 'hosp') {
-    const rows = ag.hosp.flatMap((s) => s.lines.map((l) => `<tr><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num neg">-${jd(l.price * l.qty)}</td><td class="num">${jd((l.cost || 0) * l.qty)}</td></tr>`)).join('');
+    const rows = ag.hosp.flatMap((s) => s.lines.map((l) => `<tr><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(l.name)}${s.by ? ` <small style="color:var(--muted)">· ${esc(adminName(s.by))}</small>` : ''}</td><td class="num">${l.qty}</td><td class="num neg">-${jd(l.price * l.qty)}</td><td class="num">${jd((l.cost || 0) * l.qty)}</td></tr>`)).join('');
     return `<div class="ahead"><div><h1>${esc(t('tHosp'))}</h1><p>${A ? 'بتنحسب تكلفة بدون إيراد، وبتطلع بالإكسل بالسالب' : 'Counted as cost with no revenue; negative in Excel'}</p></div><div class="actions">${exportBtns}</div></div>
       <div class="toolbar">${dateBar()}</div>
       <div class="card"><table class="tbl"><thead><tr><th>${A ? 'الوقت' : 'Time'}</th><th class="s">${A ? 'الصنف' : 'Item'}</th><th>${A ? 'الكمية' : 'Qty'}</th><th>${A ? 'بسعر البيع' : 'At price'}</th><th>${A ? 'التكلفة' : 'Cost'}</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="5" style="height:80px;color:var(--muted)">${A ? 'ما في ضيافة' : 'None'}</td></tr>`}<tr><td></td><td class="s"><b>${A ? 'المجموع' : 'Total'}</b></td><td></td><td class="num neg">-${jd(ag.hospSell)}</td><td class="num">${jd(ag.hospCost)}</td></tr></tbody></table></div>`;
   }
   const rows = adminCache.sales.map((s) => `<tr class="${s.voided ? 'voided' : ''}"><td class="num">#${s.no}</td><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(s.lines.map((l) => `${l.name} ×${l.qty}`).join('، '))}</td>
-    <td>${s.type === 'hosp' ? `<span class="tag h">${esc(t('hosp'))}</span>` : `<span class="tag">${esc(t(s.pay))}</span>`}</td><td class="num ${s.type === 'hosp' ? 'neg' : ''}">${s.type === 'hosp' ? '-' : ''}${jd(s.total)}</td>
+    <td>${s.type === 'hosp' ? `<span class="tag h">${esc(t('hosp'))}${s.by ? ' · ' + esc(adminName(s.by)) : ''}</span>` : `<span class="tag">${esc(t(s.pay))}</span>`}${s.disc ? ` <span class="tag d">${esc(t('disc'))} ${s.discPct}% · ${esc(adminName(s.by))}</span>` : ''}</td><td class="num ${s.type === 'hosp' ? 'neg' : ''}">${s.type === 'hosp' ? '-' : ''}${jd(s.total)}</td>
     <td>${s.voided ? (A ? 'ملغي' : 'Void') : `<button class="btn sm danger" data-act="void" data-id="${s.id}">${A ? 'إلغاء' : 'Void'}</button>`}</td></tr>`).join('');
   return `<div class="ahead"><div><h1>${esc(t('tSales'))}</h1><p>${A ? 'إلغاء أي طلب بيرجّع الكمية للمخزون وبيشيله من الحسابات' : 'Voiding returns the stock and removes it from totals'}</p></div><div class="actions">${exportBtns}</div></div>
     <div class="toolbar">${dateBar()}</div>
@@ -680,7 +702,7 @@ async function exportExcel() {
   const payRows = ['cash', 'visa', 'cliq'].map((p) => { const v = ag.byPay[p] || 0; return [payName[p], r3(v), ag.rev ? Math.round((v / ag.rev) * 100) + '%' : '0%', '']; });
   sheet('الملخص العام', [
     { title: 'الأرقام الرئيسية', head: ['البند', 'القيمة (د.أ)', '', ''], money: [1], intRows: [0], rows: [
-      ['عدد الطلبات', ag.orders, '', ''], ['إجمالي المبيعات', r3(ag.rev), '', ''], ['تكلفة اللي انباع', r3(ag.cogs), '', ''],
+      ['عدد الطلبات', ag.orders, '', ''], ['إجمالي المبيعات (بعد الخصم)', r3(ag.rev), '', ''], ['الخصومات', -r3(ag.disc), '', ''], ['تكلفة اللي انباع', r3(ag.cogs), '', ''],
       ['الضيافة بسعر البيع', -r3(ag.hospSell), '', ''], ['الضيافة بالتكلفة', -r3(ag.hospCost), '', '']], total: ['صافي الربح', r3(ag.profit), '', ''] },
     { title: 'حسب طريقة الدفع', head: ['طريقة الدفع', 'المبلغ (د.أ)', 'النسبة', ''], money: [1], rows: payRows, total: ['المجموع', r3(ag.rev), '100%', ''] },
     { title: 'الأكثر مبيعاً', head: ['الصنف', 'الكمية', 'الإيراد (د.أ)', 'الربح (د.أ)'], money: [2, 3], rows: top },
@@ -689,12 +711,12 @@ async function exportExcel() {
   /* 2. detailed sales */
   const det = [];
   sales.forEach((s) => s.lines.forEach((l) => {
-    const h = s.type === 'hosp', tot = l.price * l.qty, c = (l.cost || 0) * l.qty;
-    det.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : payName[s.pay], l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c)]);
+    const h = s.type === 'hosp', gross = l.price * l.qty, tot = h ? gross : lineNet(l), c = (l.cost || 0) * l.qty;
+    det.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), s.disc ? -r3(gross - tot) : '', h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : payName[s.pay], l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c), s.by || '']);
   }));
-  sheet('المبيعات التفصيلية', [{ head: ['التاريخ', 'الوقت', 'رقم الطلب', 'الصنف', 'الكمية', 'سعر الحبة', 'المجموع', 'النوع', 'طريقة الدفع', 'تكلفة الحبة', 'التكلفة', 'الربح'],
-    money: [5, 6, 9, 10, 11], rows: det, total: ['المجموع', '', '', '', sum(det, 4), '', r3(Math.round(sum(det, 6) * 1000)), '', '', '', r3(Math.round(sum(det, 10) * 1000)), r3(Math.round(sum(det, 11) * 1000))] }],
-  [18, 12, 14, 40, 12, 16, 16, 14, 16, 16, 16, 16]);
+  sheet('المبيعات التفصيلية', [{ head: ['التاريخ', 'الوقت', 'رقم الطلب', 'الصنف', 'الكمية', 'سعر الحبة', 'الخصم', 'المجموع', 'النوع', 'طريقة الدفع', 'تكلفة الحبة', 'التكلفة', 'الربح', 'الأدمن'],
+    money: [5, 6, 7, 10, 11, 12], rows: det, total: ['المجموع', '', '', '', sum(det, 4), '', r3(Math.round(sum(det, 6) * 1000)), r3(Math.round(sum(det, 7) * 1000)), '', '', '', r3(Math.round(sum(det, 11) * 1000)), r3(Math.round(sum(det, 12) * 1000)), ''] }],
+  [18, 12, 14, 40, 12, 16, 14, 16, 14, 16, 16, 16, 16, 14]);
 
   /* 3. items */
   const items = Object.values(ag.byItem).sort((a, b) => b.rev - a.rev).map((o) => [o.name, o.qty, r3(o.rev), r3(o.cost), r3(o.rev - o.cost)]);
@@ -709,9 +731,9 @@ async function exportExcel() {
 
   /* 5. hospitality */
   const hosp = [];
-  ag.hosp.forEach((s) => s.lines.forEach((l) => hosp.push([s.day, timeOf(s.ts), l.nameAr || l.name, l.qty, -r3(l.price * l.qty), 'ضيافة', r3((l.cost || 0) * l.qty)])));
-  sheet('الضيافة', [{ head: ['التاريخ', 'الوقت', 'الصنف', 'الكمية', 'بسعر البيع (د.أ)', 'ملاحظة', 'التكلفة (د.أ)'], money: [4, 6], rows: hosp,
-    total: ['المجموع', '', '', sum(hosp, 3), -r3(ag.hospSell), '', r3(ag.hospCost)] }], [18, 12, 40, 12, 22, 14, 20]);
+  ag.hosp.forEach((s) => s.lines.forEach((l) => hosp.push([s.day, timeOf(s.ts), l.nameAr || l.name, l.qty, -r3(l.price * l.qty), 'ضيافة', r3((l.cost || 0) * l.qty), s.by || ''])));
+  sheet('الضيافة', [{ head: ['التاريخ', 'الوقت', 'الصنف', 'الكمية', 'بسعر البيع (د.أ)', 'ملاحظة', 'التكلفة (د.أ)', 'الأدمن'], money: [4, 6], rows: hosp,
+    total: ['المجموع', '', '', sum(hosp, 3), -r3(ag.hospSell), '', r3(ag.hospCost), ''] }], [18, 12, 40, 12, 22, 14, 20, 14]);
 
   /* 6. stock */
   const stock = [];
@@ -730,6 +752,12 @@ async function exportExcel() {
 /* ---------- Google Sheet sync (only part that needs internet; waits quietly) ---------- */
 let syncing = false, syncTimer;
 function syncSoon(ms = 1500) { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms); }
+/* the sheet shows each line at its price after discount, and who gave a discount or hospitality */
+function forSheet(s) {
+  if (!s.disc && !s.by) return s;
+  const tag = s.disc ? ` (خصم ${s.discPct}% · ${s.by})` : ` (${s.by})`;
+  return Object.assign({}, s, { lines: s.lines.map((l) => Object.assign({}, l, { nameAr: (l.nameAr || l.name) + tag, price: s.disc ? lineNet(l) / l.qty : l.price })) });
+}
 async function syncNow(manual) {
   if (syncing) return;
   if (!S.settings.sheetUrl) { if (manual) toast(S.lang === 'ar' ? 'الشيت مش مربوط · اربطه من الإعدادات' : 'Link the sheet in Settings', true); return; }
@@ -742,7 +770,7 @@ async function syncNow(manual) {
   if (!batch.length && !reset && sig === S.settings.stockSig) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
   syncing = true;
   try {
-    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', reset, sales: batch, stock }) });
+    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', reset, sales: batch.map(forSheet), stock }) });
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || 'sheet');
     if (out.url && out.url !== S.settings.sheetView) { S.settings.sheetView = out.url; }
@@ -779,11 +807,11 @@ function settingsTab() {
       <div class="field"><label for="sView">${A ? 'رابط فتح الشيت (docs.google.com)' : 'Sheet link to open (docs.google.com)'}</label><input class="inp" id="sView" dir="ltr" value="${esc(sheetViewUrl())}" placeholder="https://docs.google.com/spreadsheets/d/.../edit"></div>
       <p>${A ? 'آخر رفع' : 'Last upload'}: ${esc(last)} · ${A ? 'بالانتظار' : 'pending'}: ${S.pending}</p>
       <div class="actions"><button class="btn primary" data-act="saveSheet" style="flex:1">${A ? 'حفظ' : 'Save'}</button><button class="btn dark" data-act="syncNow" style="flex:1">${A ? 'ارفع هلأ' : 'Upload now'}</button></div></div>
-    <div class="setcard"><h3>${A ? 'كلمة سر الـ Admin' : 'Admin password'}</h3><p>${A ? 'أرقام بس، من 4 لـ 8. كلمة السر الأولى 1234، غيّرها.' : 'Digits only, 4 to 8. The first one is 1234; change it.'}</p>
-      <div class="field"><label for="pNew">${A ? 'كلمة السر الجديدة' : 'New password'}</label><input class="inp c num" id="pNew" type="password" inputmode="numeric" maxlength="8"></div>
-      <div class="field"><label for="pNew2">${A ? 'أعد كتابتها' : 'Repeat it'}</label><input class="inp c num" id="pNew2" type="password" inputmode="numeric" maxlength="8"></div>
-      <button class="btn primary" data-act="savePin">${A ? 'غيّر كلمة السر' : 'Change password'}</button></div>
-    <div class="setcard"><h3>${A ? 'تنبيه المخزون' : 'Low stock alert'}</h3><p>${A ? 'النظام بينبهك لما يضل من الصنف هالعدد من الكراتين أو أقل: بعد البيعة مباشرة، وبرقم أحمر على زر Admin، وبفلتر "قربت تخلص".' : 'Alert when this many boxes or fewer are left.'}</p>
+${ADMINS.map((d) => `    <div class="setcard"><h3>${A ? 'كلمة سر' : 'Password'} · ${esc(L(d.ar, d.en))}</h3><p>${A ? `أرقام بس، من 4 لـ 8. بتفتح الـ Admin والضيافة والخصم، وبيتسجل اسم ${d.ar} بالإكسل.` : 'Digits only, 4 to 8. Opens Admin, hospitality and the discount.'}</p>
+      <div class="field"><label for="pNew-${d.id}">${A ? 'كلمة السر الجديدة' : 'New password'}</label><input class="inp c num" id="pNew-${d.id}" type="password" inputmode="numeric" maxlength="8"></div>
+      <div class="field"><label for="pNew2-${d.id}">${A ? 'أعد كتابتها' : 'Repeat it'}</label><input class="inp c num" id="pNew2-${d.id}" type="password" inputmode="numeric" maxlength="8"></div>
+      <button class="btn primary" data-act="savePin" data-id="${d.id}">${A ? `غيّر كلمة سر ${d.ar}` : `Change ${d.en}'s password`}</button></div>
+`).join('')}    <div class="setcard"><h3>${A ? 'تنبيه المخزون' : 'Low stock alert'}</h3><p>${A ? 'النظام بينبهك لما يضل من الصنف هالعدد من الكراتين أو أقل: بعد البيعة مباشرة، وبرقم أحمر على زر Admin، وبفلتر "قربت تخلص".' : 'Alert when this many boxes or fewer are left.'}</p>
       <div class="field"><label for="lowB">${A ? 'نبّهني لما يضل (كرتونة)' : 'Alert at (boxes)'}</label><input class="inp c num" id="lowB" type="number" inputmode="numeric" min="1" max="20" value="${lowBoxes()}"></div>
       <button class="btn primary" data-act="saveLow">${A ? 'حفظ' : 'Save'}</button></div>
     <div class="setcard"><h3>${A ? 'نسخة احتياطية' : 'Backup'}</h3><p>${A ? 'نزّل ملف فيه كل شي: الأصناف والأسعار والمخزون وكل المبيعات. احفظه بمكان ثاني، وبترجّعه على أي جهاز.' : 'Download a file with everything. Restore it on any device.'}</p>
@@ -844,13 +872,15 @@ document.addEventListener('click', async (e) => {
     case 'closeModal': closeModal(); break;
     case 'inc': { const l = S.cart[+el.dataset.i]; const it = S.items[l.id]; if (l.qty >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock}` : `Only ${it.stock} left`, true); break; } l.qty++; S.given = null; rerenderCart(); break; }
     case 'dec': { const i = +el.dataset.i; if (S.cart[i].qty > 1) S.cart[i].qty--; else S.cart.splice(i, 1); S.given = null; rerenderCart(); break; }
-    case 'clearCart': S.cart = []; S.given = null; rerenderCart(); break;
+    case 'clearCart': S.cart = []; S.given = null; S.disc = null; rerenderCart(); break;
     case 'pay': S.pay = id; S.given = null; rerenderCart(); break;
     case 'given': S.given = +el.dataset.v; rerenderCart(); break;
     case 'checkout':
       if (S.pay === 'cash' && S.given != null && S.given < cartTotal()) { toast(t('lessThan'), true); break; }
       saveSale('sale'); break;
-    case 'hosp': askPin(t('pinHosp'), () => saveSale('hosp')); break;
+    case 'hosp': askPin(t('pinHosp'), (who) => saveSale('hosp', who)); break;
+    case 'disc': if (S.cart.length && !S.disc) askPin(t('pinDisc'), (who) => { S.disc = { pct: DISC_PCT, by: who }; S.given = null; rerenderCart(); }); break;
+    case 'rmDisc': S.disc = null; S.given = null; rerenderCart(); break;
     case 'pin': pinKey(el.dataset.k); break;
     case 'theme': S.settings.theme = S.settings.theme === 'dark' ? 'light' : 'dark'; saveSettings(); render(); if (S.admin.tab === 'settings' && S.view === 'admin') fillStorageInfo(); break;
     case 'lang': S.lang = S.lang === 'ar' ? 'en' : 'ar'; S.settings.lang = S.lang; saveSettings(); render(); break;
@@ -878,10 +908,14 @@ document.addEventListener('click', async (e) => {
     case 'openSheet': openSheet(); break;
     case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = $('#sKey').value.trim(); S.settings.sheetView = $('#sView').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
     case 'savePin': {
-      const a1 = $('#pNew').value, a2 = $('#pNew2').value;
+      const id = el.dataset.id, who = ADMINS.find((d) => d.id === id), other = ADMINS.find((d) => d.id !== id);
+      const a1 = $('#pNew-' + id).value, a2 = $('#pNew2-' + id).value;
       if (!/^\d{4,8}$/.test(a1)) { toast(S.lang === 'ar' ? 'لازم 4 لـ 8 أرقام' : '4 to 8 digits', true); break; }
       if (a1 !== a2) { toast(S.lang === 'ar' ? 'الكلمتين مش متطابقات' : 'They do not match', true); break; }
-      S.settings.pin = await sha(a1); await saveSettings(); $('#pNew').value = $('#pNew2').value = ''; toast(S.lang === 'ar' ? 'تغيّرت كلمة السر' : 'Password changed'); break;
+      if (a1 === '0000') { toast(S.lang === 'ar' ? '0000 محجوزة لكبسة المسح، اختار غيرها' : '0000 is reserved, pick another', true); break; }
+      const h = await sha(a1);
+      if (other && S.settings.pins[other.id] === h) { toast(S.lang === 'ar' ? `هاي كلمة سر ${other.ar}، اختار وحدة مختلفة` : 'That is the other admin\'s password', true); break; }
+      S.settings.pins[id] = h; await saveSettings(); $('#pNew-' + id).value = $('#pNew2-' + id).value = ''; toast(S.lang === 'ar' ? `تغيّرت كلمة سر ${who.ar}` : 'Password changed'); break;
     }
     case 'backup': backup(); break;
     case 'saveLow': { const n = parseInt($('#lowB').value, 10); if (!(n >= 1 && n <= 20)) { toast(S.lang === 'ar' ? 'رقم من 1 لـ 20' : '1 to 20', true); break; } S.settings.lowBoxes = n; await saveSettings(); refreshHeader(); toast(S.lang === 'ar' ? `انحفظ: التنبيه لما يضل ${n} كرتونة` : 'Saved'); break; }
