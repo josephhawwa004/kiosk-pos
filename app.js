@@ -736,17 +736,19 @@ async function syncNow(manual) {
   if (!navigator.onLine) { if (manual) toast(S.lang === 'ar' ? 'ما في إنترنت · بيترفع لحاله لما يرجع' : 'Offline · will upload when online', true); return; }
   const batch = (await DB.unsynced()).sort((a, b) => a.ts - b.ts).slice(0, 200);
   const reset = !!S.settings.pendingReset;
-  if (!batch.length && !reset) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
+  /* the item list goes up too whenever it changed (new items, stock, ON/OFF, names), even with no new sale */
+  const stock = S.groups.slice().sort((a, b) => a.order - b.order).flatMap((g) => itemsOf(g.id).map((it) => ({ name: it.ar ? `${g.ar} - ${it.ar}` : g.ar, stock: it.stock, units: it.units || '', on: isAvail(it) ? 'ON' : 'OFF' })));
+  const sig = await sha(JSON.stringify(stock));
+  if (!batch.length && !reset && sig === S.settings.stockSig) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
   syncing = true;
   try {
-    const stock = S.groups.flatMap((g) => itemsOf(g.id).map((it) => ({ name: it.ar ? `${g.ar} - ${it.ar}` : g.ar, stock: it.stock, units: it.units || '', on: isAvail(it) ? 'ON' : 'OFF' })));
     const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', reset, sales: batch, stock }) });
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || 'sheet');
     if (out.url && out.url !== S.settings.sheetView) { S.settings.sheetView = out.url; }
     await DB.tx(['sales'], 'readwrite', (tx) => { const st = tx.objectStore('sales'); batch.forEach((s) => st.put(Object.assign({}, s, { syncedFlag: 1 }))); });
     if (reset) { if (!out.reset) throw new Error(S.lang === 'ar' ? 'حدّث كود الشيت ليقدر يمسح' : 'update the sheet script to allow clearing'); S.settings.pendingReset = false; if (manual) toast(S.lang === 'ar' ? 'انمسح الشيت كمان' : 'Sheet cleared too'); }
-    S.settings.lastSync = Date.now(); await saveSettings();
+    S.settings.stockSig = sig; S.settings.lastSync = Date.now(); await saveSettings();
     S.pending = (await DB.unsynced()).length;
     if (manual) toast(S.lang === 'ar' ? 'انرفع على الشيت' : 'Uploaded');
     if (S.pending) syncSoon(500);
@@ -904,7 +906,7 @@ document.addEventListener('keydown', (e) => {
 });
 window.addEventListener('online', () => { refreshHeader(); syncSoon(500); });
 window.addEventListener('offline', refreshHeader);
-setInterval(() => { if (S.pending && navigator.onLine) syncNow(); }, 60000);
+setInterval(() => { if (navigator.onLine) syncNow(); }, 60000);
 setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0; } }, 30000);
 
 /* ---------- start ---------- */
@@ -913,6 +915,7 @@ setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0
     await loadAll();
     S.today = dayOf();
     render();
+    setTimeout(() => { if (navigator.onLine) syncNow(); }, 3000);
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       const hadOld = !!navigator.serviceWorker.controller;
