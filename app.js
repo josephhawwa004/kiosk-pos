@@ -767,7 +767,7 @@ async function syncNow(manual) {
   /* the item list goes up too whenever it changed (new items, stock, ON/OFF, names), even with no new sale */
   const stock = S.groups.slice().sort((a, b) => a.order - b.order).flatMap((g) => itemsOf(g.id).map((it) => ({ name: it.ar ? `${g.ar} - ${it.ar}` : g.ar, stock: it.stock, units: it.units || '', on: isAvail(it) ? 'ON' : 'OFF' })));
   const sig = await sha(JSON.stringify(stock));
-  if (!batch.length && !reset && sig === S.settings.stockSig) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
+  if (!manual && !batch.length && !reset && sig === S.settings.stockSig) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
   syncing = true;
   try {
     const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', reset, sales: batch.map(forSheet), stock }) });
