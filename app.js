@@ -141,6 +141,12 @@ async function loadAll() {
       its.forEach((i) => { if (i !== k) delete cat.items[i.id]; });
     });
   }
+  if (cat.seedVersion < 6) { /* v6: Matrix splits into Classic and Special flavours (gum, coffee cola, pina colada, lemon & mint) */
+    const k = cat.items['matrix-1'];
+    if (k) { k.ar = 'عادي'; k.en = 'Classic'; k.img = 'img/matrix-classic.webp'; }
+    const sp = cat.items['matrix-6'];
+    if (sp) { sp.ar = 'نكهات مميزة'; sp.en = 'Special Flavours'; sp.img = 'img/matrix-special.webp'; }
+  }
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
