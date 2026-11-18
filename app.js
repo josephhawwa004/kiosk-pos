@@ -150,6 +150,7 @@ async function loadAll() {
     if (sp) { sp.ar = 'نكهات مميزة'; sp.en = 'Special Flavours'; sp.img = 'img/matrix-special.webp'; }
   }
   if (cat.seedVersion < 7) mergeItems(cat, MERGES_V7); /* v7: more same-price groups become one item */
+  if (cat.seedVersion < 8) mergeItems(cat, [{ g: 'bm', keep: 'bm-2', ids: ['bm-2', 'bm-6'], ar: '185 مل', en: '185 ml', img: 'img/bm-small.webp' }]); /* v8: small BM cans together */
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
