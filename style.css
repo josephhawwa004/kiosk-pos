@@ -69,7 +69,7 @@ main.sell{flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 18p
 .badge.mid{top:auto;inset-inline-end:auto;height:28px;padding:0 12px;font-size:12px}
 .tile.off{background:#F4F3F0;color:var(--muted)}
 .tile.off .ph{background:var(--line2)}
-.tile.off img{filter:grayscale(1);opacity:.4}
+.tile.off img{filter:none;opacity:1}
 .tile.off .pr{background:#E2DFD8;color:var(--muted)}
 .empty{height:100%;min-height:240px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);text-align:center}
 .empty .ring{width:76px;height:76px;border-radius:38px;border:1.5px dashed #C9C5BC;display:flex;align-items:center;justify-content:center}
@@ -137,7 +137,7 @@ aside.cart{width:388px;flex-shrink:0;padding:16px 16px 16px 0;display:flex}
 .vbtn .pr{height:26px;padding:0 12px;border-radius:13px;display:flex;align-items:center;font-size:13px;font-weight:700;background:var(--acc-soft);color:var(--acc)}
 .vbtn:active:not(:disabled){border-color:var(--acc);transform:scale(.97)}
 .vbtn:disabled{border-style:dashed;border-color:#C9C5BC;background:#F4F3F0;color:var(--muted)}
-.vbtn:disabled img{filter:grayscale(1);opacity:.4}
+.vbtn:disabled img{filter:none;opacity:1}
 .vbtn:disabled .pr{background:#E2DFD8;color:var(--muted)}
 .field{display:flex;flex-direction:column;gap:6px}
 .field label{font-size:13px;font-weight:700;color:var(--muted)}
@@ -372,3 +372,6 @@ html[data-tiles=xs] .tile .nm{font-size:12px;line-height:1.2;display:-webkit-box
 html[data-tiles=xs] .tile .pr{height:22px;padding:0 8px;font-size:12px;border-radius:11px}
 html[data-tiles=xs] .tile .badge{top:4px;inset-inline-end:4px;height:17px;padding:0 5px;font-size:9.5px}
 html[data-tiles=xs] .tile .badge.mid{height:19px;font-size:10px;padding:0 7px}
+/* unavailable items keep their photos in full colour; the "unavailable" badge and grey price say it */
+.tile.off .ph{background:var(--soft)}
+html[data-theme=dark] .tile.off .ph{background:#F3F2EF}
