@@ -153,6 +153,7 @@ async function loadAll() {
   if (cat.seedVersion < 8) mergeItems(cat, [{ g: 'bm', keep: 'bm-2', ids: ['bm-2', 'bm-6'], ar: '185 مل', en: '185 ml', img: 'img/bm-small.webp' }]); /* v8: small BM cans together */
   if (cat.seedVersion < 9) mergeItems(cat, [{ g: 'kinza', keep: 'kinza', ids: ['kinza', 'kinza-6'], ar: null, en: null, img: 'img/kinza-mix.webp' }]); /* v9: Kinza soda water joins Kinza */
   if (cat.seedVersion < 10) mergeItems(cat, [{"g": "barbican", "keep": "barbican-1", "ids": ["barbican-1", "barbican-2"], "ar": "علب", "en": "Cans", "img": "img/barbican-cans.webp"}, {"g": "barbican", "keep": "barbican-3", "ids": ["barbican-3", "barbican-4", "barbican-5", "barbican-6"], "ar": "قزاز", "en": "Bottles", "img": "img/barbican-bottles.webp"}, {"g": "baladna", "keep": "baladna-1", "ids": ["baladna-1", "baladna-2", "baladna-3", "baladna-4"], "ar": "حليب", "en": "Flavoured milk", "img": "img/baladna-milk.webp"}]); /* v10: Barbican cans / bottles, Baladna milk / coffee milk */
+  if (cat.seedVersion < 11) mergeItems(cat, [{"g": "bm", "keep": "bm-3", "ids": ["bm-3", "bm-4", "bm-5"], "ar": "نكهات", "en": "Flavours", "img": "img/bm-flavours.webp"}]); /* v11: BM pineapple, orange and berry together */
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
