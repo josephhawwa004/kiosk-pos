@@ -199,6 +199,7 @@ function groupMatches(g, q) {
 function render() {
   document.documentElement.lang = S.lang;
   document.documentElement.dataset.theme = S.settings.theme === 'dark' ? 'dark' : 'light';
+  document.documentElement.dataset.tiles = S.settings.tiles || 's';
   document.documentElement.dir = S.lang === 'ar' ? 'rtl' : 'ltr';
   const focus = rememberFocus();
   $('#app').innerHTML = header() + (S.view === 'sell' ? sellView() : adminView());
@@ -856,7 +857,9 @@ ${ADMINS.map((d) => `    <div class="setcard"><h3>${A ? 'كلمة سر' : 'Passw
       <div class="field"><label for="pNew-${d.id}">${A ? 'كلمة السر الجديدة' : 'New password'}</label><input class="inp c num" id="pNew-${d.id}" type="password" inputmode="numeric" maxlength="8"></div>
       <div class="field"><label for="pNew2-${d.id}">${A ? 'أعد كتابتها' : 'Repeat it'}</label><input class="inp c num" id="pNew2-${d.id}" type="password" inputmode="numeric" maxlength="8"></div>
       <button class="btn primary" data-act="savePin" data-id="${d.id}">${A ? `غيّر كلمة سر ${d.ar}` : `Change ${d.en}'s password`}</button></div>
-`).join('')}    <div class="setcard"><h3>${A ? 'صوت إتمام البيع' : 'Checkout sound'}</h3><p>${A ? 'صوت "كا-تشينغ" بيطلع مع كل بيعة. بيشتغل بدون نت.' : 'A cha-ching plays after every sale. Works offline.'}</p>
+`).join('')}    <div class="setcard"><h3>${A ? 'حجم الأصناف بشاشة البيع' : 'Item size on the sell screen'}</h3><p>${A ? 'كل ما صغرت، بيبين أصناف أكثر بالشاشة بدون ما تنزل لتحت.' : 'Smaller shows more items without scrolling.'}</p>
+      <div class="seg seg3">${[['xs', A ? 'صغير جداً' : 'Very small'], ['s', A ? 'صغير' : 'Small'], ['l', A ? 'كبير' : 'Large']].map(([v, l]) => `<button class="segbtn ${(S.settings.tiles || 's') === v ? 'on' : ''}" data-act="tiles" data-id="${v}">${esc(l)}</button>`).join('')}</div></div>
+    <div class="setcard"><h3>${A ? 'صوت إتمام البيع' : 'Checkout sound'}</h3><p>${A ? 'صوت "كا-تشينغ" بيطلع مع كل بيعة. بيشتغل بدون نت.' : 'A cha-ching plays after every sale. Works offline.'}</p>
       <div class="actions"><button class="btn ${S.settings.sound === false ? '' : 'primary'}" data-act="toggleSound" style="flex:1">${S.settings.sound === false ? (A ? 'الصوت: OFF' : 'Sound: OFF') : (A ? 'الصوت: ON' : 'Sound: ON')}</button><button class="btn dark" data-act="testSound" style="flex:1">${A ? 'جرّب الصوت' : 'Play it'}</button></div></div>
     <div class="setcard"><h3>${A ? 'تنبيه المخزون' : 'Low stock alert'}</h3><p>${A ? 'النظام بينبهك لما يضل من الصنف هالعدد من الكراتين أو أقل: بعد البيعة مباشرة، وبرقم أحمر على زر Admin، وبفلتر "قربت تخلص".' : 'Alert when this many boxes or fewer are left.'}</p>
       <div class="field"><label for="lowB">${A ? 'نبّهني لما يضل (كرتونة)' : 'Alert at (boxes)'}</label><input class="inp c num" id="lowB" type="number" inputmode="numeric" min="1" max="20" value="${lowBoxes()}"></div>
@@ -955,6 +958,7 @@ document.addEventListener('click', async (e) => {
     case 'openSheet': openSheet(); break;
     case 'toggleSound': S.settings.sound = S.settings.sound === false; await saveSettings(); render(); if (S.settings.sound) playCash(); break;
     case 'testSound': playCash(true); break;
+    case 'tiles': S.settings.tiles = el.dataset.id; await saveSettings(); render(); break;
     case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = $('#sKey').value.trim(); S.settings.sheetView = $('#sView').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
     case 'savePin': {
       const id = el.dataset.id, who = ADMINS.find((d) => d.id === id), other = ADMINS.find((d) => d.id !== id);

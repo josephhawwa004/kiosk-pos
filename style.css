@@ -355,3 +355,20 @@ html[data-theme=dark] .tag.d{background:#3A1416;color:#FF8A8A}
 .cartfoot .actions .btn.hosp svg{width:15px;height:15px}
 .cartfoot .actions .btn.big{min-width:0}
 .discrow .num{direction:ltr}
+/* item size on the sell screen: s (default) and xs; l = the original big tiles */
+html[data-tiles=s] .grid{grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:9px}
+html[data-tiles=s] .tile{min-height:0;padding:7px;gap:5px;border-radius:16px}
+html[data-tiles=s] .tile .ph{height:74px;border-radius:11px}
+html[data-tiles=s] .tile .ph img{max-height:64px}
+html[data-tiles=s] .tile .nm{font-size:13.5px;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+html[data-tiles=s] .tile .pr{height:25px;padding:0 10px;font-size:13px;border-radius:13px}
+html[data-tiles=s] .tile .badge{top:5px;inset-inline-end:5px;height:20px;padding:0 7px;font-size:10px}
+html[data-tiles=s] .tile .badge.mid{height:22px;font-size:11px;padding:0 9px}
+html[data-tiles=xs] .grid{grid-template-columns:repeat(auto-fill,minmax(102px,1fr));gap:7px}
+html[data-tiles=xs] .tile{min-height:0;padding:5px;gap:4px;border-radius:13px}
+html[data-tiles=xs] .tile .ph{height:54px;border-radius:9px}
+html[data-tiles=xs] .tile .ph img{max-height:46px}
+html[data-tiles=xs] .tile .nm{font-size:12px;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+html[data-tiles=xs] .tile .pr{height:22px;padding:0 8px;font-size:12px;border-radius:11px}
+html[data-tiles=xs] .tile .badge{top:4px;inset-inline-end:4px;height:17px;padding:0 5px;font-size:9.5px}
+html[data-tiles=xs] .tile .badge.mid{height:19px;font-size:10px;padding:0 7px}
