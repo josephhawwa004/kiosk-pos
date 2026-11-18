@@ -116,6 +116,17 @@ function seedCatalog() {
   return { cats: SEED.cats, groups, items, seedVersion: SEED.version };
 }
 
+/* merge flavours into one item: stock is added up, any price already set is kept, old sales keep their names */
+function mergeItems(cat, list) {
+  list.forEach((m) => {
+    const its = m.ids.map((id) => cat.items[id]).filter(Boolean); if (!its.length) return;
+    const k = cat.items[m.keep] || its[0]; const pick = (f) => { const x = its.find((i) => i[f] != null && i[f] !== ''); return x ? x[f] : null; };
+    k.stock = its.reduce((s, i) => s + (Number(i.stock) || 0), 0);
+    k.sell = k.sell != null ? k.sell : pick('sell'); k.box = k.box != null ? k.box : pick('box'); k.units = k.units != null ? k.units : pick('units');
+    k.off = its.every((i) => i.off); k.ar = m.ar; k.en = m.en; k.img = m.img;
+    its.forEach((i) => { if (i !== k) delete cat.items[i.id]; });
+  });
+}
 async function loadAll() {
   await DB.open();
   let cat = await DB.get('catalog');
@@ -131,22 +142,14 @@ async function loadAll() {
     const g = cat.groups.find((x) => x.id === 'berrywater');
     if (g) g.cat = 'water';
   }
-  if (cat.seedVersion < 5) { /* v5: same-price flavours become one item: stock added up, any price already set is kept */
-    MERGES_V5.forEach((m) => {
-      const its = m.ids.map((id) => cat.items[id]).filter(Boolean); if (!its.length) return;
-      const k = cat.items[m.keep] || its[0]; const pick = (f) => { const x = its.find((i) => i[f] != null && i[f] !== ''); return x ? x[f] : null; };
-      k.stock = its.reduce((s, i) => s + (Number(i.stock) || 0), 0);
-      k.sell = k.sell != null ? k.sell : pick('sell'); k.box = k.box != null ? k.box : pick('box'); k.units = k.units != null ? k.units : pick('units');
-      k.off = its.every((i) => i.off); k.ar = m.ar; k.en = m.en; k.img = m.img;
-      its.forEach((i) => { if (i !== k) delete cat.items[i.id]; });
-    });
-  }
+  if (cat.seedVersion < 5) mergeItems(cat, MERGES_V5); /* v5: same-price flavours become one item */
   if (cat.seedVersion < 6) { /* v6: Matrix splits into Classic and Special flavours (gum, coffee cola, pina colada, lemon & mint) */
     const k = cat.items['matrix-1'];
     if (k) { k.ar = 'عادي'; k.en = 'Classic'; k.img = 'img/matrix-classic.webp'; }
     const sp = cat.items['matrix-6'];
     if (sp) { sp.ar = 'نكهات مميزة'; sp.en = 'Special Flavours'; sp.img = 'img/matrix-special.webp'; }
   }
+  if (cat.seedVersion < 7) mergeItems(cat, MERGES_V7); /* v7: more same-price groups become one item */
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
@@ -260,6 +263,7 @@ function gridHtml() {
   return head + `<div class="grid">${tiles}</div>`;
 }
 const MERGES_V5 = [{"g": "super", "keep": "super-1", "ids": ["super-1", "super-2", "super-3", "super-4", "super-5"], "ar": null, "en": null, "img": "img/super-1.webp"}, {"g": "matrix", "keep": "matrix-1", "ids": ["matrix-1", "matrix-2", "matrix-3", "matrix-4", "matrix-5", "matrix-6", "matrix-7", "matrix-8", "matrix-9", "matrix-10"], "ar": null, "en": null, "img": "img/matrix-mix.webp"}, {"g": "kinza", "keep": "kinza", "ids": ["kinza", "kinza-2", "kinza-3", "kinza-4", "kinza-5"], "ar": "مشروب غازي", "en": "Soda", "img": "img/kinza-mix.webp"}, {"g": "monster", "keep": "monster-1", "ids": ["monster-1", "monster-2", "monster-3", "monster-4", "monster-5", "monster-6"], "ar": null, "en": null, "img": "img/monster-mix.webp"}, {"g": "luna", "keep": "luna-1", "ids": ["luna-1", "luna-2", "luna-3", "luna-4", "luna-5"], "ar": null, "en": null, "img": "img/luna-mix.webp"}, {"g": "redbull", "keep": "redbull-1", "ids": ["redbull-1", "redbull-2"], "ar": "عادي ولايت", "en": "Original & Lite", "img": "img/redbull-mix.webp"}];
+const MERGES_V7 = [{"g": "freez", "keep": "freez-1", "ids": ["freez-1", "freez-2", "freez-3", "freez-4", "freez-5"], "ar": null, "en": null, "img": "img/freez-mix.webp"}, {"g": "bansella", "keep": "bansella-1", "ids": ["bansella-1", "bansella-2"], "ar": null, "en": null, "img": "img/bansella-mix.webp"}, {"g": "rani", "keep": "rani-1", "ids": ["rani-1", "rani-2"], "ar": null, "en": null, "img": "img/rani-mix.webp"}, {"g": "tonic", "keep": "tonic-1", "ids": ["tonic-1", "tonic-2"], "ar": null, "en": null, "img": "img/tonic-mix.webp"}, {"g": "glass", "keep": "glass-1", "ids": ["glass-1", "glass-2", "glass-3"], "ar": null, "en": null, "img": "img/glass-mix.webp"}, {"g": "almaraiprotein", "keep": "almaraiprotein-1", "ids": ["almaraiprotein-1", "almaraiprotein-2", "almaraiprotein-3"], "ar": null, "en": null, "img": "img/almaraiprotein-mix.webp"}, {"g": "canary", "keep": "canary-1", "ids": ["canary-1", "canary-2", "canary-3", "canary-4"], "ar": null, "en": null, "img": "img/canary-mix.webp"}, {"g": "tasco", "keep": "tasco-1", "ids": ["tasco-1", "tasco-2"], "ar": null, "en": null, "img": "img/tasco-mix.webp"}, {"g": "mrbrown", "keep": "mrbrown-1", "ids": ["mrbrown-1", "mrbrown-2", "mrbrown-3", "mrbrown-4", "mrbrown-5"], "ar": null, "en": null, "img": "img/mrbrown-mix.webp"}, {"g": "icetea", "keep": "icetea-1", "ids": ["icetea-1", "icetea-2", "icetea-3", "icetea-4", "icetea-5", "icetea-6", "icetea-7", "icetea-8"], "ar": null, "en": null, "img": "img/icetea-mix.webp"}, {"g": "blu", "keep": "blu-1", "ids": ["blu-1", "blu-2", "blu-3", "blu-4"], "ar": null, "en": null, "img": "img/blu-mix.webp"}, {"g": "black", "keep": "black-1", "ids": ["black-1", "black-2"], "ar": null, "en": null, "img": "img/black-mix.webp"}, {"g": "landessa", "keep": "landessa-1", "ids": ["landessa-1", "landessa-2", "landessa-3", "landessa-4", "landessa-5"], "ar": null, "en": null, "img": "img/landessa-mix.webp"}];
 /* two admins; each one's password opens Admin, hospitality and the discount */
 const ADMINS = [{ id: 'anas', ar: 'أنس', en: 'Anas' }, { id: 'lawrence', ar: 'لورنس', en: 'Lawrence' }];
 const DISC_PCT = 30;
