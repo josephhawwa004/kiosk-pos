@@ -131,6 +131,16 @@ async function loadAll() {
     const g = cat.groups.find((x) => x.id === 'berrywater');
     if (g) g.cat = 'water';
   }
+  if (cat.seedVersion < 5) { /* v5: same-price flavours become one item: stock added up, any price already set is kept */
+    MERGES_V5.forEach((m) => {
+      const its = m.ids.map((id) => cat.items[id]).filter(Boolean); if (!its.length) return;
+      const k = cat.items[m.keep] || its[0]; const pick = (f) => { const x = its.find((i) => i[f] != null && i[f] !== ''); return x ? x[f] : null; };
+      k.stock = its.reduce((s, i) => s + (Number(i.stock) || 0), 0);
+      k.sell = k.sell != null ? k.sell : pick('sell'); k.box = k.box != null ? k.box : pick('box'); k.units = k.units != null ? k.units : pick('units');
+      k.off = its.every((i) => i.off); k.ar = m.ar; k.en = m.en; k.img = m.img;
+      its.forEach((i) => { if (i !== k) delete cat.items[i.id]; });
+    });
+  }
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
@@ -243,6 +253,7 @@ function gridHtml() {
   }).join('');
   return head + `<div class="grid">${tiles}</div>`;
 }
+const MERGES_V5 = [{"g": "super", "keep": "super-1", "ids": ["super-1", "super-2", "super-3", "super-4", "super-5"], "ar": null, "en": null, "img": "img/super-1.webp"}, {"g": "matrix", "keep": "matrix-1", "ids": ["matrix-1", "matrix-2", "matrix-3", "matrix-4", "matrix-5", "matrix-6", "matrix-7", "matrix-8", "matrix-9", "matrix-10"], "ar": null, "en": null, "img": "img/matrix-mix.webp"}, {"g": "kinza", "keep": "kinza", "ids": ["kinza", "kinza-2", "kinza-3", "kinza-4", "kinza-5"], "ar": "مشروب غازي", "en": "Soda", "img": "img/kinza-mix.webp"}, {"g": "monster", "keep": "monster-1", "ids": ["monster-1", "monster-2", "monster-3", "monster-4", "monster-5", "monster-6"], "ar": null, "en": null, "img": "img/monster-mix.webp"}, {"g": "luna", "keep": "luna-1", "ids": ["luna-1", "luna-2", "luna-3", "luna-4", "luna-5"], "ar": null, "en": null, "img": "img/luna-mix.webp"}, {"g": "redbull", "keep": "redbull-1", "ids": ["redbull-1", "redbull-2"], "ar": "عادي ولايت", "en": "Original & Lite", "img": "img/redbull-mix.webp"}];
 /* two admins; each one's password opens Admin, hospitality and the discount */
 const ADMINS = [{ id: 'anas', ar: 'أنس', en: 'Anas' }, { id: 'lawrence', ar: 'لورنس', en: 'Lawrence' }];
 const DISC_PCT = 30;
