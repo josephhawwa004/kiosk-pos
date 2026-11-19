@@ -160,6 +160,11 @@ async function loadAll() {
     mergeItems(cat, [{ g: 'vidal', keep: 'vidal', ids: ['vidal', 'vidalshilin'], ar: null, en: null, img: 'img/vidal-mix.webp' }]);
     if (!Object.values(cat.items).some((i) => i.groupId === 'vidalshilin')) cat.groups = cat.groups.filter((g) => g.id !== 'vidalshilin');
   }
+  if (cat.seedVersion < 16) { /* v16: Jojo candy joins Vidal candy */
+    mergeItems(cat, [{ g: 'vidal', keep: 'vidal', ids: ['vidal', 'jojo-1', 'jojo-2'], ar: null, en: null, img: 'img/sous-mix.webp' }]);
+    const g = cat.groups.find((x) => x.id === 'vidal'); if (g && g.ar === 'سوس فيدال') { g.ar = 'سوس جوجو وفيدال'; g.en = 'Jojo & Vidal Candy'; }
+    if (!Object.values(cat.items).some((i) => i.groupId === 'jojo')) cat.groups = cat.groups.filter((x) => x.id !== 'jojo');
+  }
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
