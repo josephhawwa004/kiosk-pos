@@ -312,6 +312,7 @@ const cartDisc = () => (S.disc && S.cart.length ? Math.round(cartSub() * S.disc.
 const cartTotal = () => cartSub() - cartDisc();
 const lineNet = (l) => (l.net != null ? l.net : l.price * l.qty);
 const adminName = (ar) => { const x = ADMINS.find((d) => d.ar === ar); return x ? L(x.ar, x.en) : ar; };
+const A2 = () => S.lang === 'ar';
 function cartHtml() {
   if (!S.cart.length) S.disc = null;
   const total = cartTotal(), empty = !S.cart.length, count = S.cart.reduce((a, l) => a + l.qty, 0);
@@ -324,8 +325,14 @@ function cartHtml() {
         <div class="qty"><button data-act="inc" data-i="${i}" aria-label="+">+</button><span class="num">${l.qty}</span><button data-act="dec" data-i="${i}" aria-label="-">−</button></div>
         <span class="lt num">${jd(l.price * l.qty)}</span></div>`;
     }).join('');
-  const pays = ['cash', 'visa', 'cliq', 'split'].map((p) => `<button class="segbtn ${S.pay === p ? 'on' : ''}" data-act="pay" data-id="${p}" aria-pressed="${S.pay === p}">${esc(t(p))}</button>`).join('');
-  const cash = ''; /* no amount-received / change calculator: the cashier just picks the payment type */
+  const pays = ['cash', 'visa', 'cliq'].map((p) => `<button class="segbtn ${S.pay === p ? 'on' : ''} ${p === 'cash' && S.cashPart ? 'part' : ''}" data-act="pay" data-id="${p}" aria-pressed="${S.pay === p}">${esc(t(p))}</button>`).join('');
+  let cash = '';
+  if (!empty && S.cashPart) {
+    const rest = total - S.cashPart;
+    cash = `<div class="change part"><span>${A2() ? 'كاش' : 'Cash'} <b class="num">${jd(S.cashPart)}</b> · ${A2() ? 'ضايل' : 'Left'} <b class="num">${jd(rest)}</b></span><small>${S.pay === 'cash' ? (A2() ? 'اختار فيزا أو كليك للباقي' : 'Pick Visa or CliQ for the rest') : `${esc(t(S.pay))} ${jd(rest)}`}</small></div>`;
+  } else if (!empty && S.pay === 'cash' && S.given != null && S.given > total) {
+    cash = `<div class="change"><span>${A2() ? 'استلم' : 'Received'} <b class="num">${jd(S.given)}</b></span><span>${esc(t('change'))} <b class="num big">${jd(S.given - total)}</b></span></div>`;
+  }
   return `<div class="cartcard">
     <div class="carthead"><div><b>${esc(t('order'))}</b>${empty ? '' : `<span class="count num">${count}</span>`}</div>${empty ? '' : `<button class="btn-ghost" data-act="clearCart">${esc(t('clear'))}</button>`}</div>
     <div class="lines scroll">${lines}</div>
@@ -333,7 +340,7 @@ function cartHtml() {
       ${S.disc ? `<div class="discrow"><span>${esc(t('sub'))}</span><span class="num">${jd(cartSub())}</span></div>
       <div class="discrow d"><span>${esc(t('disc'))} ${S.disc.pct}% · ${esc(adminName(S.disc.by))}</span><span class="num">-${jd(cartDisc())}</span><button class="xbtn" data-act="rmDisc" aria-label="remove discount">${ICON.x}</button></div>` : ''}
       <div class="total"><span>${esc(t('total'))}</span><b class="num">${jd(total)} <small>${esc(t('jd'))}</small></b></div>
-      <div class="seg seg4" role="group">${pays}</div>${cash}
+      <div class="seg seg3" role="group">${pays}</div>${cash}
       <div class="actions"><button class="btn hosp" data-act="hosp" ${empty ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('hosp'))}</span></button>
         <button class="btn hosp disc ${S.disc ? 'on' : ''}" data-act="disc" ${empty || S.disc ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('disc'))} <span class="num">${DISC_PCT}%</span></span></button>
         <button class="btn primary big" data-act="checkout" ${empty ? 'disabled' : ''}>${esc(t('checkout'))}</button></div>
@@ -349,7 +356,7 @@ function addToCart(id) {
   if (inCart >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock} من ${itemName(it)}` : `Only ${it.stock} left`, true); return; }
   const l = S.cart.find((x) => x.id === id);
   if (l) l.qty++; else S.cart.push({ id, name: itemName(it), price: it.sell, qty: 1 });
-  S.given = null;
+  S.given = null; S.cashPart = null;
   closeModal(); rerenderCart();
 }
 
@@ -384,6 +391,38 @@ function playCash(force) {
   } catch (e) { /* ignore */ }
 }
 document.addEventListener('pointerdown', () => { if (SND.ctx && SND.ctx.state === 'suspended') SND.ctx.resume(); }, true);
+
+/* ---------- cash keypad: exact, more (change back) or part (rest by visa / cliq) ---------- */
+function openCashPad() { S.modal = { kind: 'cash', val: '' }; drawCashPad(); }
+function drawCashPad() {
+  const m = S.modal, A = A2(), tot = cartTotal();
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'];
+  const v = parseJD(m.val), diff = v - tot;
+  const note = !m.val ? (A ? 'اكتب كم دفع الزبون كاش' : 'Type the cash received') : diff >= 0 ? `${esc(t('change'))}: <b class="num">${jd(diff)}</b>` : `${A ? 'ضايل' : 'Left'} <b class="num">${jd(-diff)}</b> ${A ? 'فيزا أو كليك' : 'by Visa or CliQ'}`;
+  openModal(`<div class="modal cashpad" role="dialog" aria-label="${esc(t('cash'))}">
+    <div class="mhead"><div class="grow"><b>${esc(t('cash'))}</b><small>${esc(t('total'))}: <span class="num">${jd(tot)}</span> ${esc(t('jd'))}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+    <div class="mbody"><div class="cpgrid">
+      <div class="cpleft"><div class="cpshow num">${m.val ? esc(m.val) : '0'}</div>
+        <div class="pinpad">${keys.map((k) => `<button data-act="ck" data-k="${k}">${k === 'del' ? '⌫' : k}</button>`).join('')}</div></div>
+      <div class="cpright"><button class="exact" data-act="cExact"><b>${A ? 'عالقد' : 'Exact'}</b><span class="num">${jd(tot)}</span></button>
+        <div class="cpnote ${diff >= 0 && m.val ? 'ok' : ''}">${note}</div>
+        <button class="btn primary big" data-act="cOk" ${v ? '' : 'disabled'}>${esc(t('ok'))}</button></div>
+    </div></div></div>`);
+}
+function cashKey(k) {
+  const m = S.modal; if (!m || m.kind !== 'cash') return;
+  if (k === 'del') m.val = m.val.slice(0, -1);
+  else if (k === '.') { if (!m.val.includes('.')) m.val = (m.val || '0') + '.'; }
+  else if (m.val.length < 7 && !(m.val.includes('.') && m.val.split('.')[1].length >= 3)) m.val = m.val === '0' ? k : m.val + k;
+  drawCashPad();
+}
+function cashOk(exact) {
+  const tot = cartTotal(), v = exact ? tot : parseJD(S.modal.val);
+  if (!v) return;
+  S.pay = 'cash';
+  if (v >= tot) { S.given = v; S.cashPart = null; } else { S.cashPart = v; S.given = null; }
+  closeModal(); rerenderCart();
+}
 
 /* ---------- split payment: part cash, part visa / cliq ---------- */
 const PAYS = ['cash', 'visa', 'cliq'];
@@ -432,10 +471,9 @@ async function saveSale(type, who) {
   const sale = { id: now.toString(36) + '-' + Math.random().toString(36).slice(2, 6), ts: now, day: dayOf(new Date(now)), no: S.dayCount + 1, type, pay: type === 'sale' ? S.pay : null, given: type === 'sale' && S.pay === 'cash' ? S.given : null, lines, total, cost, voided: false, syncedFlag: 0 };
   if (disc) Object.assign(sale, { sub, disc, discPct: S.disc.pct, by: S.disc.by });
   if (type === 'hosp' && who) sale.by = who;
-  if (type === 'sale' && S.pay === 'split') {
-    const sp = {}; PAYS.forEach((p) => { const v = parseJD(S.split && S.split[p]); if (v) sp[p] = v; });
-    if (Object.values(sp).reduce((s, v) => s + v, 0) !== total) { toast(S.lang === 'ar' ? 'مجموع التقسيم لازم يساوي المجموع' : 'Split must equal the total', true); return; }
-    sale.split = sp;
+  if (type === 'sale' && S.cashPart) {
+    if (S.pay === 'cash' || S.cashPart >= total) { toast(A2() ? 'اختار فيزا أو كليك للمبلغ الباقي' : 'Pick Visa or CliQ for the rest', true); return; }
+    sale.split = { cash: S.cashPart, [S.pay]: total - S.cashPart };
   }
   const items = JSON.parse(JSON.stringify(S.items));
   for (const l of lines) items[l.id].stock -= l.qty;
@@ -448,7 +486,7 @@ async function saveSale(type, who) {
   const crossed = lines.filter((l) => { const before = S.items[l.id].stock, after = items[l.id].stock, lim = lowLimit(items[l.id]); return before > lim && after <= lim; }).map((l) => l.name);
   const empty = lines.filter((l) => S.items[l.id].stock > 0 && items[l.id].stock <= 0).map((l) => l.name);
   S.items = items; S.dayCount++; S.pending++;
-  S.cart = []; S.given = null; S.disc = null; S.split = null; if (S.pay === 'split') S.pay = 'cash';
+  const wasPart = !!sale.split; S.cart = []; S.given = null; S.cashPart = null; S.disc = null; S.split = null; if (wasPart) S.pay = 'cash';
   if (type === 'sale') playCash();
   toast(type === 'hosp' ? t('hospDone', jd(total)) : t('sold', jd(total), sale.split ? splitText(sale.split, S.lang === 'ar') : t(sale.pay)));
   if (empty.length || crossed.length) setTimeout(() => toast(empty.length
@@ -1011,20 +1049,23 @@ document.addEventListener('click', async (e) => {
     case 'tile': { const its = itemsOf(id); if (its.length === 1) addToCart(its[0].id); else flavorSheet(id); break; }
     case 'addItem': addToCart(id); break;
     case 'closeModal': closeModal(); break;
-    case 'inc': { const l = S.cart[+el.dataset.i]; const it = S.items[l.id]; if (l.qty >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock}` : `Only ${it.stock} left`, true); break; } l.qty++; S.given = null; rerenderCart(); break; }
-    case 'dec': { const i = +el.dataset.i; if (S.cart[i].qty > 1) S.cart[i].qty--; else S.cart.splice(i, 1); S.given = null; rerenderCart(); break; }
-    case 'clearCart': S.cart = []; S.given = null; S.disc = null; rerenderCart(); break;
-    case 'pay': S.pay = id; S.given = null; rerenderCart(); break;
+    case 'inc': { const l = S.cart[+el.dataset.i]; const it = S.items[l.id]; if (l.qty >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock}` : `Only ${it.stock} left`, true); break; } l.qty++; S.given = null; S.cashPart = null; rerenderCart(); break; }
+    case 'dec': { const i = +el.dataset.i; if (S.cart[i].qty > 1) S.cart[i].qty--; else S.cart.splice(i, 1); S.given = null; S.cashPart = null; rerenderCart(); break; }
+    case 'clearCart': S.cart = []; S.given = null; S.cashPart = null; S.disc = null; rerenderCart(); break;
+    case 'pay': if (id === 'cash') { if (S.cart.length) openCashPad(); else { S.pay = 'cash'; rerenderCart(); } break; } S.pay = id; S.given = null; rerenderCart(); break;
+    case 'ck': cashKey(el.dataset.k); break;
+    case 'cExact': cashOk(true); break;
+    case 'cOk': cashOk(false); break;
     case 'spHalf': { const tot = cartTotal(), h = Math.round(tot / 2 / 10) * 10; setSplit({ cash: tot - h, [id]: h }); break; }
     case 'spRest': { const others = PAYS.filter((p) => p !== id).reduce((s, p) => s + parseJD(S.split[p]), 0); const v = Math.max(0, cartTotal() - others); S.split[id] = v ? (v / 1000).toFixed(3) : ''; const i = $('#sp-' + id); if (i) i.value = S.split[id]; splitLeft(); break; }
     case 'spOk': if (cartTotal() === splitSum()) { closeModal(); saveSale('sale'); } break;
     case 'given': S.given = +el.dataset.v; rerenderCart(); break;
     case 'checkout':
-      if (S.pay === 'split') { openSplit(); break; }
+      if (S.cashPart && S.pay === 'cash') { toast(A2() ? 'اختار فيزا أو كليك للمبلغ الباقي' : 'Pick Visa or CliQ for the rest', true); break; }
       saveSale('sale'); break;
     case 'hosp': askPin(t('pinHosp'), (who) => saveSale('hosp', who)); break;
-    case 'disc': if (S.cart.length && !S.disc) askPin(t('pinDisc'), (who) => { S.disc = { pct: DISC_PCT, by: who }; S.given = null; rerenderCart(); }); break;
-    case 'rmDisc': S.disc = null; S.given = null; rerenderCart(); break;
+    case 'disc': if (S.cart.length && !S.disc) askPin(t('pinDisc'), (who) => { S.disc = { pct: DISC_PCT, by: who }; S.given = null; S.cashPart = null; rerenderCart(); }); break;
+    case 'rmDisc': S.disc = null; S.given = null; S.cashPart = null; rerenderCart(); break;
     case 'pin': pinKey(el.dataset.k); break;
     case 'theme': S.settings.theme = S.settings.theme === 'dark' ? 'light' : 'dark'; saveSettings(); render(); if (S.admin.tab === 'settings' && S.view === 'admin') fillStorageInfo(); break;
     case 'lang': S.lang = S.lang === 'ar' ? 'en' : 'ar'; S.settings.lang = S.lang; saveSettings(); render(); break;
