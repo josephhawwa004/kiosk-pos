@@ -815,6 +815,8 @@ function forSheet(s) {
   const tag = s.disc ? ` (خصم ${s.discPct}% · ${s.by})` : ` (${s.by})`;
   return Object.assign({}, s, { lines: s.lines.map((l) => Object.assign({}, l, { nameAr: (l.nameAr || l.name) + tag, price: s.disc ? lineNet(l) / l.qty : l.price })) });
 }
+/* tablet keyboards add capitals, Arabic digits or spaces: the secret is always plain lowercase */
+const cleanKey = (k) => String(k || '').replace(/[\u0660-\u0669]/g, (d) => d.charCodeAt(0) - 0x660).replace(/[\u06F0-\u06F9]/g, (d) => d.charCodeAt(0) - 0x6F0).replace(/[\u2010-\u2015\u2212]/g, '-').replace(/\s+/g, '').toLowerCase();
 async function syncNow(manual) {
   if (syncing) return;
   if (!S.settings.sheetUrl) { if (manual) toast(S.lang === 'ar' ? 'الشيت مش مربوط · اربطه من الإعدادات' : 'Link the sheet in Settings', true); return; }
@@ -827,7 +829,7 @@ async function syncNow(manual) {
   if (!manual && !batch.length && !reset && sig === S.settings.stockSig) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
   syncing = true;
   try {
-    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: S.settings.sheetKey || '', reset, sales: batch.map(forSheet), stock }) });
+    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: cleanKey(S.settings.sheetKey), reset, sales: batch.map(forSheet), stock }) });
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || 'sheet');
     if (out.url && out.url !== S.settings.sheetView) { S.settings.sheetView = out.url; }
@@ -860,7 +862,7 @@ function settingsTab() {
     <div class="setcard"><h3>${A ? 'ربط Google Sheet' : 'Google Sheet link'}</h3>
       <p>${A ? 'بعد ما تعمل الشيت حسب التعليمات، الصق الرابط هون. المبيعات بتترفع لحالها أول ما يكون في إنترنت، وإذا ما في بتستنى.' : 'Paste the web-app link. Sales upload automatically whenever there is internet.'}</p>
       <div class="field"><label for="sUrl">${A ? 'رابط الشيت (Web app URL)' : 'Web app URL'}</label><input class="inp" id="sUrl" dir="ltr" value="${esc(S.settings.sheetUrl || '')}" placeholder="https://script.google.com/macros/s/.../exec"></div>
-      <div class="field"><label for="sKey">${A ? 'الرمز السري للشيت' : 'Sheet secret'}</label><input class="inp" id="sKey" dir="ltr" value="${esc(S.settings.sheetKey || '')}"></div>
+      <div class="field"><label for="sKey">${A ? 'الرمز السري للشيت' : 'Sheet secret'}</label><input class="inp" id="sKey" dir="ltr" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" value="${esc(S.settings.sheetKey || '')}"></div>
       <div class="field"><label for="sView">${A ? 'رابط فتح الشيت (docs.google.com)' : 'Sheet link to open (docs.google.com)'}</label><input class="inp" id="sView" dir="ltr" value="${esc(sheetViewUrl())}" placeholder="https://docs.google.com/spreadsheets/d/.../edit"></div>
       <p>${A ? 'آخر رفع' : 'Last upload'}: ${esc(last)} · ${A ? 'بالانتظار' : 'pending'}: ${S.pending}</p>
       <div class="actions"><button class="btn primary" data-act="saveSheet" style="flex:1">${A ? 'حفظ' : 'Save'}</button><button class="btn dark" data-act="syncNow" style="flex:1">${A ? 'ارفع هلأ' : 'Upload now'}</button></div></div>
@@ -970,7 +972,7 @@ document.addEventListener('click', async (e) => {
     case 'toggleSound': S.settings.sound = S.settings.sound === false; await saveSettings(); render(); if (S.settings.sound) playCash(); break;
     case 'testSound': playCash(true); break;
     case 'tiles': S.settings.tiles = el.dataset.id; await saveSettings(); render(); break;
-    case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = $('#sKey').value.trim(); S.settings.sheetView = $('#sView').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
+    case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = cleanKey($('#sKey').value); S.settings.sheetUrl = S.settings.sheetUrl.replace(/\s+/g, ''); S.settings.sheetView = $('#sView').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
     case 'savePin': {
       const id = el.dataset.id, who = ADMINS.find((d) => d.id === id), other = ADMINS.find((d) => d.id !== id);
       const a1 = $('#pNew-' + id).value, a2 = $('#pNew2-' + id).value;
