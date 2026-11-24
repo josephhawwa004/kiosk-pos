@@ -329,7 +329,7 @@ function cartHtml() {
   let cash = '';
   if (!empty && S.cashPart) {
     const rest = total - S.cashPart;
-    cash = `<div class="change part"><span>${A2() ? 'كاش' : 'Cash'} <b class="num">${jd(S.cashPart)}</b> · ${A2() ? 'ضايل' : 'Left'} <b class="num">${jd(rest)}</b></span><small>${S.pay === 'cash' ? (A2() ? 'اختار فيزا أو كليك للباقي' : 'Pick Visa or CliQ for the rest') : `${esc(t(S.pay))} ${jd(rest)}`}</small></div>`;
+    cash = `<div class="change part"><small>${S.pay === 'cash' ? (A2() ? `اختار فيزا أو كليك للـ ${jd(rest)} الباقية` : 'Pick Visa or CliQ for the rest') : `${esc(t(S.pay))} ${jd(rest)} ✓`}</small></div>`;
   } else if (!empty && S.pay === 'cash' && S.given != null && S.given > total) {
     cash = `<div class="change"><span>${A2() ? 'استلم' : 'Received'} <b class="num">${jd(S.given)}</b></span><span>${esc(t('change'))} <b class="num big">${jd(S.given - total)}</b></span></div>`;
   }
@@ -339,7 +339,9 @@ function cartHtml() {
     <div class="cartfoot">
       ${S.disc ? `<div class="discrow"><span>${esc(t('sub'))}</span><span class="num">${jd(cartSub())}</span></div>
       <div class="discrow d"><span>${esc(t('disc'))} ${S.disc.pct}% · ${esc(adminName(S.disc.by))}</span><span class="num">-${jd(cartDisc())}</span><button class="xbtn" data-act="rmDisc" aria-label="remove discount">${ICON.x}</button></div>` : ''}
-      <div class="total"><span>${esc(t('total'))}</span><b class="num">${jd(total)} <small>${esc(t('jd'))}</small></b></div>
+      ${!empty && S.cashPart ? `<div class="discrow"><span>${esc(t('total'))}</span><span class="num">${jd(total)}</span></div>
+      <div class="discrow d"><span>${A2() ? 'دفع كاش' : 'Paid cash'}</span><span class="num">-${jd(S.cashPart)}</span></div>
+      <div class="total"><span>${A2() ? 'الباقي عليه' : 'Still to pay'}</span><b class="num">${jd(total - S.cashPart)} <small>${esc(t('jd'))}</small></b></div>` : `<div class="total"><span>${esc(t('total'))}</span><b class="num">${jd(total)} <small>${esc(t('jd'))}</small></b></div>`}
       <div class="seg seg3" role="group">${pays}</div>${cash}
       <div class="actions"><button class="btn hosp" data-act="hosp" ${empty ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('hosp'))}</span></button>
         <button class="btn hosp disc ${S.disc ? 'on' : ''}" data-act="disc" ${empty || S.disc ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('disc'))} <span class="num">${DISC_PCT}%</span></span></button>
@@ -398,9 +400,9 @@ function drawCashPad() {
   const m = S.modal, A = A2(), tot = cartTotal();
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'];
   const v = parseJD(m.val), diff = v - tot;
-  const note = !m.val ? (A ? 'اكتب كم دفع الزبون كاش' : 'Type the cash received') : diff >= 0 ? `${esc(t('change'))}: <b class="num">${jd(diff)}</b>` : `${A ? 'ضايل' : 'Left'} <b class="num">${jd(-diff)}</b> ${A ? 'فيزا أو كليك' : 'by Visa or CliQ'}`;
+  const note = !m.val ? (A ? 'اكتب كم أعطى الزبون' : 'Type the cash received') : diff >= 0 ? `${esc(t('change'))}: <b class="num">${jd(diff)}</b>` : `${A ? 'الباقي عليه' : 'Still to pay'} <b class="num">${jd(-diff)}</b>`;
   openModal(`<div class="modal cashpad" role="dialog" aria-label="${esc(t('cash'))}">
-    <div class="mhead"><div class="grow"><b>${esc(t('cash'))}</b><small>${esc(t('total'))}: <span class="num">${jd(tot)}</span> ${esc(t('jd'))}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+    <div class="mhead"><div class="grow"><b>${esc(t('cash'))}</b><small>${esc(t('total'))}: <span class="num">${jd(tot)}</span>${v ? ` − <span class="num">${jd(Math.min(v, tot))}</span> = <span class="num" style="font-weight:700">${jd(Math.max(0, tot - v))}</span>` : ''} ${esc(t('jd'))}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
     <div class="mbody"><div class="cpgrid">
       <div class="cpleft"><div class="cpshow num">${m.val ? esc(m.val) : '0'}</div>
         <div class="pinpad">${keys.map((k) => `<button data-act="ck" data-k="${k}">${k === 'del' ? '⌫' : k}</button>`).join('')}</div></div>
