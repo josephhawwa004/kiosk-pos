@@ -209,18 +209,28 @@ function groupMatches(g, q) {
 /* ---------- fit to screen: the layout is designed for 1280x700 and scales down to any smaller tablet screen ---------- */
 const DESIGN_W = 1280, DESIGN_H = 700;
 function fitScreen() {
-  const z = Math.min(1, window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
   const b = document.body;
-  b.style.zoom = z === 1 ? '' : String(z);
-  b.style.height = z === 1 ? '' : `${window.innerHeight / z}px`;
-  b.style.width = z === 1 ? '' : `${window.innerWidth / z}px`;
+  const apply = (z) => {
+    b.style.zoom = z === 1 ? '' : String(z);
+    b.style.height = z === 1 ? '' : `${window.innerHeight / z}px`;
+    b.style.width = z === 1 ? '' : `${window.innerWidth / z}px`;
+  };
+  let z = Math.min(1, window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
+  apply(z);
+  /* a bigger font setting on the tablet can still push things past the edge: shrink a little more until nothing spills over */
+  for (let i = 0; i < 4; i++) {
+    const W = window.innerWidth; let lo = 0, hi = W; /* rects are in screen pixels */
+    document.querySelectorAll('#app .tbl, #app .tbl td, #app .switch, #app .btn, #app .tile, #app .cartcard, #app .sidebtn, #app .chip').forEach((el) => { const q = el.getBoundingClientRect(); if (q.width) { lo = Math.min(lo, q.left); hi = Math.max(hi, q.right); } });
+    const over = (hi - lo) / W;
+    if (over <= 1.002 || z < 0.45) break;
+    z = Math.max(0.45, (z / over) * 0.99); apply(z);
+  }
 }
 window.addEventListener('resize', fitScreen);
 window.addEventListener('orientationchange', () => setTimeout(fitScreen, 200));
 
 /* ---------- render: shell ---------- */
 function render() {
-  fitScreen();
   document.documentElement.lang = S.lang;
   document.documentElement.dataset.theme = S.settings.theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.tiles = S.settings.tiles || 's';
@@ -228,6 +238,7 @@ function render() {
   const focus = rememberFocus();
   $('#app').innerHTML = header() + (S.view === 'sell' ? sellView() : adminView());
   restoreFocus(focus);
+  fitScreen();
 }
 function rememberFocus() { const a = document.activeElement; return a && a.id ? { id: a.id, s: a.selectionStart, e: a.selectionEnd } : null; }
 function restoreFocus(f) { if (!f) return; const el = document.getElementById(f.id); if (!el) return; el.focus(); try { if (f.s != null) el.setSelectionRange(f.s, f.e); } catch (e) { /* number inputs */ } }
@@ -462,7 +473,7 @@ function adminTabHtml() {
   }
   return '';
 }
-const rerenderAdmin = () => { const m = $('#adminMain'); if (!m) return; const f = rememberFocus(); m.innerHTML = adminTabHtml(); restoreFocus(f); };
+const rerenderAdmin = () => { const m = $('#adminMain'); if (!m) return; const f = rememberFocus(); m.innerHTML = adminTabHtml(); restoreFocus(f); fitScreen(); };
 
 function itemsTab() {
   const q = S.admin.q.trim();

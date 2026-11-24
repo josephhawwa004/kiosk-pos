@@ -12,7 +12,7 @@
   --good:#15803D;--bad:#B91C1C;--warn:#B45309;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Plex,system-ui,sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+html,body{-webkit-text-size-adjust:100%;text-size-adjust:100%;margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Plex,system-ui,sans-serif;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 body{overflow:hidden;user-select:none;-webkit-user-select:none}
 input,textarea,select{user-select:text;-webkit-user-select:text}
 button,input,select{font-family:inherit;font-size:inherit;color:inherit}
