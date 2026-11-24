@@ -380,3 +380,26 @@ nav.side.cats{overflow-y:auto;scrollbar-width:none}
 nav.side.cats::-webkit-scrollbar{display:none}
 nav.side.cats .sidebtn{min-height:60px;flex-shrink:0}
 html,body{overflow:hidden}
+/* split payment */
+.seg4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.seg4 .segbtn{font-size:15px;padding:0 4px}
+.seg2{grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:12px}
+.seg2 .segbtn{height:46px;font-size:14px}
+.splittot{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.splittot span{font-weight:600;color:var(--muted)}
+.splittot b{font-size:30px}
+.splittot b small{font-size:14px;color:var(--muted)}
+.splitrow{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;margin-bottom:10px}
+.splitrow b{font-size:17px}
+.splitrow .inp{height:52px;font-size:20px;text-align:center;direction:ltr}
+.splitleft{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-radius:12px;margin:6px 0 12px;font-weight:700}
+.splitleft.bad{background:#FFF4EC;color:var(--acc-ink);border:1.5px solid var(--acc-line)}
+.splitleft.ok{background:#EAF7EE;color:#1E7A3C;border:1.5px solid #BFE5CA}
+.splitleft b{font-size:20px}
+html[data-theme=dark] .splitleft.bad{background:#2E1C12}
+html[data-theme=dark] .splitleft.ok{background:#12301C;color:#7EE2A0;border-color:#1E5A32}
+/* pop-ups use the space of the (fitted) screen, not the raw viewport */
+.modal{max-height:calc(100% - 24px)}
+.overlay{padding:12px}
+.mbody{overflow-y:auto}
+.mbody>*{flex-shrink:0}

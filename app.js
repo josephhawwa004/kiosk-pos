@@ -35,7 +35,7 @@ const T = {
     total: 'المجموع', cash: 'كاش', visa: 'فيزا', cliq: 'كليك', received: 'المبلغ المستلم من الزبون', exact: 'بالضبط',
     change: 'الباقي للزبون', short: 'المبلغ ناقص', hosp: 'ضيافة', checkout: 'إتمام البيع', pickFlavor: 'اختار النكهة', soldOut: 'خلصت',
     sold: (t, p) => `تم البيع · ${t} د.أ · ${p}`, hospDone: (t) => `تمت الضيافة · ${t} د.أ`, lessThan: 'المبلغ المستلم أقل من المجموع',
-    pinTitle: 'كلمة سر الأدمن', pinHosp: 'مطلوبة للضيافة', pinDisc: 'مطلوبة للخصم', disc: 'خصم', sub: 'قبل الخصم', pinAdmin: 'للدخول على الـ Admin', wrongPin: 'كلمة السر غلط', ok: 'تأكيد', cancel: 'إلغاء',
+    split: 'تقسيم', splitTitle: 'تقسيم الدفع', pinTitle: 'كلمة سر الأدمن', pinHosp: 'مطلوبة للضيافة', pinDisc: 'مطلوبة للخصم', disc: 'خصم', sub: 'قبل الخصم', pinAdmin: 'للدخول على الـ Admin', wrongPin: 'كلمة السر غلط', ok: 'تأكيد', cancel: 'إلغاء',
     back: 'رجوع لشاشة البيع',
     tItems: 'الأصناف والمخزون', tItemsSub: 'أسعار، كميات، ON / OFF', tEod: 'End of Day', tEodSub: 'المبيعات والربح',
     tSales: 'سجل المبيعات', tSalesSub: 'كل الطلبات وإلغاؤها', tHosp: 'الضيافة', tHospSub: 'كل عمليات الضيافة',
@@ -50,7 +50,7 @@ const T = {
     total: 'Total', cash: 'Cash', visa: 'Visa', cliq: 'CliQ', received: 'Amount received', exact: 'Exact',
     change: 'Change', short: 'Not enough', hosp: 'Hospitality', checkout: 'Complete sale', pickFlavor: 'Pick a flavour', soldOut: 'Sold out',
     sold: (t, p) => `Sold · ${t} JD · ${p}`, hospDone: (t) => `Hospitality saved · ${t} JD`, lessThan: 'Received amount is less than the total',
-    pinTitle: 'Admin password', pinHosp: 'Required for hospitality', pinDisc: 'Required for the discount', disc: 'Discount', sub: 'Before discount', pinAdmin: 'To open Admin', wrongPin: 'Wrong password', ok: 'Confirm', cancel: 'Cancel',
+    split: 'Split', splitTitle: 'Split payment', pinTitle: 'Admin password', pinHosp: 'Required for hospitality', pinDisc: 'Required for the discount', disc: 'Discount', sub: 'Before discount', pinAdmin: 'To open Admin', wrongPin: 'Wrong password', ok: 'Confirm', cancel: 'Cancel',
     back: 'Back to sales',
     tItems: 'Items & stock', tItemsSub: 'Prices, stock, ON / OFF', tEod: 'End of Day', tEodSub: 'Sales and profit',
     tSales: 'Sales log', tSalesSub: 'All orders, void', tHosp: 'Hospitality', tHospSub: 'All hospitality',
@@ -324,7 +324,7 @@ function cartHtml() {
         <div class="qty"><button data-act="inc" data-i="${i}" aria-label="+">+</button><span class="num">${l.qty}</span><button data-act="dec" data-i="${i}" aria-label="-">−</button></div>
         <span class="lt num">${jd(l.price * l.qty)}</span></div>`;
     }).join('');
-  const pays = ['cash', 'visa', 'cliq'].map((p) => `<button class="segbtn ${S.pay === p ? 'on' : ''}" data-act="pay" data-id="${p}" aria-pressed="${S.pay === p}">${esc(t(p))}</button>`).join('');
+  const pays = ['cash', 'visa', 'cliq', 'split'].map((p) => `<button class="segbtn ${S.pay === p ? 'on' : ''}" data-act="pay" data-id="${p}" aria-pressed="${S.pay === p}">${esc(t(p))}</button>`).join('');
   const cash = ''; /* no amount-received / change calculator: the cashier just picks the payment type */
   return `<div class="cartcard">
     <div class="carthead"><div><b>${esc(t('order'))}</b>${empty ? '' : `<span class="count num">${count}</span>`}</div>${empty ? '' : `<button class="btn-ghost" data-act="clearCart">${esc(t('clear'))}</button>`}</div>
@@ -333,7 +333,7 @@ function cartHtml() {
       ${S.disc ? `<div class="discrow"><span>${esc(t('sub'))}</span><span class="num">${jd(cartSub())}</span></div>
       <div class="discrow d"><span>${esc(t('disc'))} ${S.disc.pct}% · ${esc(adminName(S.disc.by))}</span><span class="num">-${jd(cartDisc())}</span><button class="xbtn" data-act="rmDisc" aria-label="remove discount">${ICON.x}</button></div>` : ''}
       <div class="total"><span>${esc(t('total'))}</span><b class="num">${jd(total)} <small>${esc(t('jd'))}</small></b></div>
-      <div class="seg seg3" role="group">${pays}</div>${cash}
+      <div class="seg seg4" role="group">${pays}</div>${cash}
       <div class="actions"><button class="btn hosp" data-act="hosp" ${empty ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('hosp'))}</span></button>
         <button class="btn hosp disc ${S.disc ? 'on' : ''}" data-act="disc" ${empty || S.disc ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('disc'))} <span class="num">${DISC_PCT}%</span></span></button>
         <button class="btn primary big" data-act="checkout" ${empty ? 'disabled' : ''}>${esc(t('checkout'))}</button></div>
@@ -385,6 +385,36 @@ function playCash(force) {
 }
 document.addEventListener('pointerdown', () => { if (SND.ctx && SND.ctx.state === 'suspended') SND.ctx.resume(); }, true);
 
+/* ---------- split payment: part cash, part visa / cliq ---------- */
+const PAYS = ['cash', 'visa', 'cliq'];
+const parseJD = (v) => { const s = String(v || '').replace(/[\u0660-\u0669]/g, (d) => d.charCodeAt(0) - 0x660).replace(/[,،٫]/g, '.').trim(); const n = parseFloat(s); return isFinite(n) && n > 0 ? Math.round(n * 1000) : 0; };
+const splitSum = () => PAYS.reduce((s, p) => s + parseJD(S.split[p]), 0);
+const splitText = (sp, A) => PAYS.filter((p) => sp[p]).map((p) => `${A === false ? T.en[p] : T.ar[p]} ${jd(sp[p])}`).join(' + ');
+function openSplit() {
+  S.split = S.split && S.split.total === cartTotal() ? S.split : { total: cartTotal(), cash: '', visa: '', cliq: '' };
+  S.modal = { kind: 'split' }; drawSplit();
+}
+function drawSplit() {
+  const A = S.lang === 'ar', tot = cartTotal();
+  const rows = PAYS.map((p) => `<div class="splitrow"><b>${esc(t(p))}</b><input class="inp num" id="sp-${p}" data-in="sp" data-id="${p}" inputmode="decimal" placeholder="0.000" value="${esc(S.split[p])}"><button class="btn sm" data-act="spRest" data-id="${p}">${A ? 'الباقي هون' : 'Rest here'}</button></div>`).join('');
+  openModal(`<div class="modal narrow" role="dialog" aria-label="${esc(t('splitTitle'))}">
+    <div class="mhead"><div class="grow"><b>${esc(t('splitTitle'))}</b><small>${A ? 'اكتب كم دفع الزبون بكل طريقة' : 'Enter how much was paid each way'}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+    <div class="mbody"><div class="splittot"><span>${esc(t('total'))}</span><b class="num">${jd(tot)} <small>${esc(t('jd'))}</small></b></div>
+      <div class="seg seg2"><button class="segbtn" data-act="spHalf" data-id="visa">${A ? 'نص كاش ونص فيزا' : 'Half cash, half visa'}</button><button class="segbtn" data-act="spHalf" data-id="cliq">${A ? 'نص كاش ونص كليك' : 'Half cash, half CliQ'}</button></div>
+      ${rows}<div class="splitleft" id="spLeft"></div>
+      <button class="btn primary big" id="spOk" data-act="spOk" style="width:100%">${esc(t('checkout'))}</button></div></div>`);
+  splitLeft();
+}
+function splitLeft() {
+  const A = S.lang === 'ar', left = cartTotal() - splitSum(), el = $('#spLeft'), ok = $('#spOk');
+  if (!el) return;
+  el.className = 'splitleft ' + (left === 0 ? 'ok' : 'bad');
+  el.innerHTML = left === 0 ? `<span>${A ? 'المبلغ مكتمل' : 'Fully paid'}</span><b>✓</b>` : left > 0 ? `<span>${A ? 'ضايل' : 'Remaining'}</span><b class="num">${jd(left)}</b>` : `<span>${A ? 'زيادة عن المجموع' : 'Over the total by'}</span><b class="num">${jd(-left)}</b>`;
+  const used = PAYS.filter((p) => parseJD(S.split[p])).length;
+  if (ok) ok.disabled = left !== 0 || used < 1;
+}
+function setSplit(vals) { PAYS.forEach((p) => { S.split[p] = vals[p] ? (vals[p] / 1000).toFixed(3) : ''; const i = $('#sp-' + p); if (i) i.value = S.split[p]; }); splitLeft(); }
+
 /* ---------- saving sales (one atomic write: sale + stock) ---------- */
 async function saveSale(type, who) {
   if (!S.cart.length) return;
@@ -402,6 +432,11 @@ async function saveSale(type, who) {
   const sale = { id: now.toString(36) + '-' + Math.random().toString(36).slice(2, 6), ts: now, day: dayOf(new Date(now)), no: S.dayCount + 1, type, pay: type === 'sale' ? S.pay : null, given: type === 'sale' && S.pay === 'cash' ? S.given : null, lines, total, cost, voided: false, syncedFlag: 0 };
   if (disc) Object.assign(sale, { sub, disc, discPct: S.disc.pct, by: S.disc.by });
   if (type === 'hosp' && who) sale.by = who;
+  if (type === 'sale' && S.pay === 'split') {
+    const sp = {}; PAYS.forEach((p) => { const v = parseJD(S.split && S.split[p]); if (v) sp[p] = v; });
+    if (Object.values(sp).reduce((s, v) => s + v, 0) !== total) { toast(S.lang === 'ar' ? 'مجموع التقسيم لازم يساوي المجموع' : 'Split must equal the total', true); return; }
+    sale.split = sp;
+  }
   const items = JSON.parse(JSON.stringify(S.items));
   for (const l of lines) items[l.id].stock -= l.qty;
   try {
@@ -413,9 +448,9 @@ async function saveSale(type, who) {
   const crossed = lines.filter((l) => { const before = S.items[l.id].stock, after = items[l.id].stock, lim = lowLimit(items[l.id]); return before > lim && after <= lim; }).map((l) => l.name);
   const empty = lines.filter((l) => S.items[l.id].stock > 0 && items[l.id].stock <= 0).map((l) => l.name);
   S.items = items; S.dayCount++; S.pending++;
-  S.cart = []; S.given = null; S.disc = null;
+  S.cart = []; S.given = null; S.disc = null; S.split = null; if (S.pay === 'split') S.pay = 'cash';
   if (type === 'sale') playCash();
-  toast(type === 'hosp' ? t('hospDone', jd(total)) : t('sold', jd(total), t(sale.pay)));
+  toast(type === 'hosp' ? t('hospDone', jd(total)) : t('sold', jd(total), sale.split ? splitText(sale.split, S.lang === 'ar') : t(sale.pay)));
   if (empty.length || crossed.length) setTimeout(() => toast(empty.length
     ? (S.lang === 'ar' ? `خلص: ${empty.join('، ')}` : `Sold out: ${empty.join(', ')}`)
     : (S.lang === 'ar' ? `تنبيه: ضايل ${lowBoxes()} كرتونة أو أقل من ${crossed.join('، ')}` : `Low stock: ${crossed.join(', ')}`), true, 6000), 2700);
@@ -646,11 +681,11 @@ function aggregate(sales) {
   const sold = live.filter((s) => s.type === 'sale'), hosp = live.filter((s) => s.type === 'hosp');
   const rev = sold.reduce((a, s) => a + s.total, 0), cogs = sold.reduce((a, s) => a + s.cost, 0);
   const hospSell = hosp.reduce((a, s) => a + s.total, 0), hospCost = hosp.reduce((a, s) => a + s.cost, 0);
-  const byPay = { cash: 0, visa: 0, cliq: 0 }; sold.forEach((s) => { byPay[s.pay] = (byPay[s.pay] || 0) + s.total; });
+  const byPay = { cash: 0, visa: 0, cliq: 0 }; sold.forEach((s) => { if (s.split) PAYS.forEach((p) => { byPay[p] += s.split[p] || 0; }); else byPay[s.pay] = (byPay[s.pay] || 0) + s.total; });
   const byItem = {};
   sold.forEach((s) => s.lines.forEach((l) => { const k = l.id; const o = byItem[k] || (byItem[k] = { name: l.name, qty: 0, rev: 0, cost: 0 }); o.qty += l.qty; o.rev += lineNet(l); o.cost += (l.cost || 0) * l.qty; }));
   const byDay = {};
-  live.forEach((s) => { const o = byDay[s.day] || (byDay[s.day] = { day: s.day, orders: 0, rev: 0, cost: 0, hospSell: 0, hospCost: 0, cash: 0, visa: 0, cliq: 0 }); if (s.type === 'sale') { o.orders++; o.rev += s.total; o.cost += s.cost; o[s.pay] += s.total; } else { o.hospSell += s.total; o.hospCost += s.cost; } });
+  live.forEach((s) => { const o = byDay[s.day] || (byDay[s.day] = { day: s.day, orders: 0, rev: 0, cost: 0, hospSell: 0, hospCost: 0, cash: 0, visa: 0, cliq: 0 }); if (s.type === 'sale') { o.orders++; o.rev += s.total; o.cost += s.cost; if (s.split) PAYS.forEach((p) => { o[p] += s.split[p] || 0; }); else o[s.pay] += s.total; } else { o.hospSell += s.total; o.hospCost += s.cost; } });
   const disc = sold.reduce((a, s) => a + (s.disc || 0), 0), discN = sold.filter((s) => s.disc).length;
   return { sold, hosp, rev, cogs, hospSell, hospCost, profit: rev - cogs - hospCost, byPay, byItem, byDay, orders: sold.length, disc, discN };
 }
@@ -687,7 +722,7 @@ function reportTab(kind) {
       <tbody>${rows || `<tr><td colspan="5" style="height:80px;color:var(--muted)">${A ? 'ما في ضيافة' : 'None'}</td></tr>`}<tr><td></td><td class="s"><b>${A ? 'المجموع' : 'Total'}</b></td><td></td><td class="num neg">-${jd(ag.hospSell)}</td><td class="num">${jd(ag.hospCost)}</td></tr></tbody></table></div>`;
   }
   const rows = adminCache.sales.map((s) => `<tr class="${s.voided ? 'voided' : ''}"><td class="num">#${s.no}</td><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(s.lines.map((l) => `${l.name} ×${l.qty}`).join('، '))}</td>
-    <td>${s.type === 'hosp' ? `<span class="tag h">${esc(t('hosp'))}${s.by ? ' · ' + esc(adminName(s.by)) : ''}</span>` : `<span class="tag">${esc(t(s.pay))}</span>`}${s.disc ? ` <span class="tag d">${esc(t('disc'))} ${s.discPct}% · ${esc(adminName(s.by))}</span>` : ''}</td><td class="num ${s.type === 'hosp' ? 'neg' : ''}">${s.type === 'hosp' ? '-' : ''}${jd(s.total)}</td>
+    <td>${s.type === 'hosp' ? `<span class="tag h">${esc(t('hosp'))}${s.by ? ' · ' + esc(adminName(s.by)) : ''}</span>` : `<span class="tag">${esc(s.split ? t('split') + ': ' + splitText(s.split, A) : t(s.pay))}</span>`}${s.disc ? ` <span class="tag d">${esc(t('disc'))} ${s.discPct}% · ${esc(adminName(s.by))}</span>` : ''}</td><td class="num ${s.type === 'hosp' ? 'neg' : ''}">${s.type === 'hosp' ? '-' : ''}${jd(s.total)}</td>
     <td>${s.voided ? (A ? 'ملغي' : 'Void') : `<button class="btn sm danger" data-act="void" data-id="${s.id}">${A ? 'إلغاء' : 'Void'}</button>`}</td></tr>`).join('');
   return `<div class="ahead"><div><h1>${esc(t('tSales'))}</h1><p>${A ? 'إلغاء أي طلب بيرجّع الكمية للمخزون وبيشيله من الحسابات' : 'Voiding returns the stock and removes it from totals'}</p></div><div class="actions">${exportBtns}</div></div>
     <div class="toolbar">${dateBar()}</div>
@@ -786,7 +821,7 @@ async function exportExcel() {
   const det = [];
   sales.forEach((s) => s.lines.forEach((l) => {
     const h = s.type === 'hosp', gross = l.price * l.qty, tot = h ? gross : lineNet(l), c = (l.cost || 0) * l.qty;
-    det.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), s.disc ? -r3(gross - tot) : '', h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : payName[s.pay], l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c), s.by || '']);
+    det.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), s.disc ? -r3(gross - tot) : '', h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : (s.split ? 'مقسوم: ' + splitText(s.split) : payName[s.pay]), l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c), s.by || '']);
   }));
   sheet('المبيعات التفصيلية', [{ head: ['التاريخ', 'الوقت', 'رقم الطلب', 'الصنف', 'الكمية', 'سعر الحبة', 'الخصم', 'المجموع', 'النوع', 'طريقة الدفع', 'تكلفة الحبة', 'التكلفة', 'الربح', 'الأدمن'],
     money: [5, 6, 7, 10, 11, 12], rows: det, total: ['المجموع', '', '', '', sum(det, 4), '', r3(Math.round(sum(det, 6) * 1000)), r3(Math.round(sum(det, 7) * 1000)), '', '', '', r3(Math.round(sum(det, 11) * 1000)), r3(Math.round(sum(det, 12) * 1000)), ''] }],
@@ -828,6 +863,11 @@ let syncing = false, syncTimer;
 function syncSoon(ms = 1500) { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms); }
 /* the sheet shows each line at its price after discount, and who gave a discount or hospitality */
 function forSheet(s) {
+  if (s.split) {
+    const base = s.disc || s.by ? forSheet(Object.assign({}, s, { split: null })) : s;
+    const parts = PAYS.filter((p) => s.split[p]);
+    return parts.map((p) => { const f = s.split[p] / s.total; return Object.assign({}, base, { pay: p, total: s.split[p], lines: base.lines.map((l) => Object.assign({}, l, { nameAr: (l.nameAr || l.name) + ' (مقسوم)', price: l.price * f, cost: l.cost == null ? null : l.cost * f })) }); });
+  }
   if (!s.disc && !s.by) return s;
   const tag = s.disc ? ` (خصم ${s.discPct}% · ${s.by})` : ` (${s.by})`;
   return Object.assign({}, s, { lines: s.lines.map((l) => Object.assign({}, l, { nameAr: (l.nameAr || l.name) + tag, price: s.disc ? lineNet(l) / l.qty : l.price })) });
@@ -846,7 +886,7 @@ async function syncNow(manual) {
   if (!manual && !batch.length && !reset && sig === S.settings.stockSig) { S.pending = 0; refreshHeader(); if (manual) toast(t('sheetOk')); return; }
   syncing = true;
   try {
-    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: cleanKey(S.settings.sheetKey), reset, sales: batch.map(forSheet), stock }) });
+    const res = await fetch(S.settings.sheetUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ key: cleanKey(S.settings.sheetKey), reset, sales: batch.flatMap(forSheet), stock }) });
     const out = await res.json();
     if (!out.ok) throw new Error(out.error || 'sheet');
     if (out.url && out.url !== S.settings.sheetView) { S.settings.sheetView = out.url; }
@@ -975,9 +1015,12 @@ document.addEventListener('click', async (e) => {
     case 'dec': { const i = +el.dataset.i; if (S.cart[i].qty > 1) S.cart[i].qty--; else S.cart.splice(i, 1); S.given = null; rerenderCart(); break; }
     case 'clearCart': S.cart = []; S.given = null; S.disc = null; rerenderCart(); break;
     case 'pay': S.pay = id; S.given = null; rerenderCart(); break;
+    case 'spHalf': { const tot = cartTotal(), h = Math.round(tot / 2 / 10) * 10; setSplit({ cash: tot - h, [id]: h }); break; }
+    case 'spRest': { const others = PAYS.filter((p) => p !== id).reduce((s, p) => s + parseJD(S.split[p]), 0); const v = Math.max(0, cartTotal() - others); S.split[id] = v ? (v / 1000).toFixed(3) : ''; const i = $('#sp-' + id); if (i) i.value = S.split[id]; splitLeft(); break; }
+    case 'spOk': if (cartTotal() === splitSum()) { closeModal(); saveSale('sale'); } break;
     case 'given': S.given = +el.dataset.v; rerenderCart(); break;
     case 'checkout':
-      if (S.pay === 'cash' && S.given != null && S.given < cartTotal()) { toast(t('lessThan'), true); break; }
+      if (S.pay === 'split') { openSplit(); break; }
       saveSale('sale'); break;
     case 'hosp': askPin(t('pinHosp'), (who) => saveSale('hosp', who)); break;
     case 'disc': if (S.cart.length && !S.disc) askPin(t('pinDisc'), (who) => { S.disc = { pct: DISC_PCT, by: who }; S.given = null; rerenderCart(); }); break;
@@ -1031,6 +1074,7 @@ document.addEventListener('input', (e) => {
   const k = e.target.dataset.in;
   if (k === 'q') { S.q = e.target.value; rerenderGrid(); }
   if (k === 'aq') { S.admin.q = e.target.value; rerenderAdmin(); }
+  if (k === 'sp' && S.split) { S.split[e.target.dataset.id] = e.target.value; splitLeft(); }
 });
 document.addEventListener('change', (e) => {
   const el = e.target;
