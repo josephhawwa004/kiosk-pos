@@ -206,8 +206,21 @@ function groupMatches(g, q) {
   return q.toLowerCase().split(/\s+/).every((w) => hay.includes(w));
 }
 
+/* ---------- fit to screen: the layout is designed for 1280x700 and scales down to any smaller tablet screen ---------- */
+const DESIGN_W = 1280, DESIGN_H = 700;
+function fitScreen() {
+  const z = Math.min(1, window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
+  const b = document.body;
+  b.style.zoom = z === 1 ? '' : String(z);
+  b.style.height = z === 1 ? '' : `${window.innerHeight / z}px`;
+  b.style.width = z === 1 ? '' : `${window.innerWidth / z}px`;
+}
+window.addEventListener('resize', fitScreen);
+window.addEventListener('orientationchange', () => setTimeout(fitScreen, 200));
+
 /* ---------- render: shell ---------- */
 function render() {
+  fitScreen();
   document.documentElement.lang = S.lang;
   document.documentElement.dataset.theme = S.settings.theme === 'dark' ? 'dark' : 'light';
   document.documentElement.dataset.tiles = S.settings.tiles || 's';
@@ -301,14 +314,7 @@ function cartHtml() {
         <span class="lt num">${jd(l.price * l.qty)}</span></div>`;
     }).join('');
   const pays = ['cash', 'visa', 'cliq'].map((p) => `<button class="segbtn ${S.pay === p ? 'on' : ''}" data-act="pay" data-id="${p}" aria-pressed="${S.pay === p}">${esc(t(p))}</button>`).join('');
-  let cash = '';
-  if (S.pay === 'cash' && !empty) {
-    const amts = [[t('exact'), total], ['1', 1000], ['5', 5000], ['10', 10000], ['20', 20000]];
-    const ch = S.given == null ? null : S.given - total;
-    cash = `<span class="lbl">${esc(t('received'))}</span>
-      <div class="seg seg5">${amts.map(([lab, v]) => `<button class="segbtn ${S.given === v ? 'on' : ''}" data-act="given" data-v="${v}">${esc(lab)}</button>`).join('')}</div>
-      <div class="change"><span>${esc(t('change'))}</span><b class="num">${ch == null ? '—' : ch < 0 ? esc(t('short')) : jd(ch) + ' ' + esc(t('jd'))}</b></div>`;
-  }
+  const cash = ''; /* no amount-received / change calculator: the cashier just picks the payment type */
   return `<div class="cartcard">
     <div class="carthead"><div><b>${esc(t('order'))}</b>${empty ? '' : `<span class="count num">${count}</span>`}</div>${empty ? '' : `<button class="btn-ghost" data-act="clearCart">${esc(t('clear'))}</button>`}</div>
     <div class="lines scroll">${lines}</div>

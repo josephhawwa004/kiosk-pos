@@ -375,3 +375,8 @@ html[data-tiles=xs] .tile .badge.mid{height:19px;font-size:10px;padding:0 7px}
 /* unavailable items keep their photos in full colour; the "unavailable" badge and grey price say it */
 .tile.off .ph{background:var(--soft)}
 html[data-theme=dark] .tile.off .ph{background:#F3F2EF}
+/* categories list scrolls when there are many sections */
+nav.side.cats{overflow-y:auto;scrollbar-width:none}
+nav.side.cats::-webkit-scrollbar{display:none}
+nav.side.cats .sidebtn{min-height:60px;flex-shrink:0}
+html,body{overflow:hidden}
