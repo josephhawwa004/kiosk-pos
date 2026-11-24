@@ -877,6 +877,8 @@ ${ADMINS.map((d) => `    <div class="setcard"><h3>${A ? 'كلمة سر' : 'Passw
     <div class="setcard"><h3>${A ? 'تنبيه المخزون' : 'Low stock alert'}</h3><p>${A ? 'النظام بينبهك لما يضل من الصنف هالعدد من الكراتين أو أقل: بعد البيعة مباشرة، وبرقم أحمر على زر Admin، وبفلتر "قربت تخلص".' : 'Alert when this many boxes or fewer are left.'}</p>
       <div class="field"><label for="lowB">${A ? 'نبّهني لما يضل (كرتونة)' : 'Alert at (boxes)'}</label><input class="inp c num" id="lowB" type="number" inputmode="numeric" min="1" max="20" value="${lowBoxes()}"></div>
       <button class="btn primary" data-act="saveLow">${A ? 'حفظ' : 'Save'}</button></div>
+    <div class="setcard"><h3>${A ? 'نقل الأصناف لجهاز ثاني' : 'Copy items to another device'}</h3><p>${A ? 'كل جهاز إله ذاكرته. عشان تنقل الأصناف والأسعار والمخزون والصور من جهاز لجهاز: نزّل ملف الأصناف هون، وابعته للجهاز الثاني (واتساب أو إيميل)، وافتحه هناك من "حمّل ملف الأصناف". المبيعات على كل جهاز ما بتتغير.' : 'Each device keeps its own items. Download the items file here and load it on the other device. Sales are not touched.'}</p>
+      <div class="actions"><button class="btn dark" data-act="exportCat" style="flex:1">${A ? 'نزّل ملف الأصناف' : 'Download items file'}</button><label class="btn" style="flex:1">${A ? 'حمّل ملف الأصناف' : 'Load items file'}<input type="file" accept=".json,application/json" id="catIn" class="sr"></label></div></div>
     <div class="setcard"><h3>${A ? 'نسخة احتياطية' : 'Backup'}</h3><p>${A ? 'نزّل ملف فيه كل شي: الأصناف والأسعار والمخزون وكل المبيعات. احفظه بمكان ثاني، وبترجّعه على أي جهاز.' : 'Download a file with everything. Restore it on any device.'}</p>
       <div class="actions"><button class="btn dark" data-act="backup" style="flex:1">${A ? 'نزّل نسخة' : 'Download backup'}</button><label class="btn" style="flex:1">${A ? 'استرجاع نسخة' : 'Restore'}<input type="file" accept=".json,application/json" id="restoreIn" class="sr"></label></div></div>
     <div class="setcard"><h3>${A ? 'بداية جديدة' : 'Fresh start'}</h3><p>${A ? 'بيمسح كل المبيعات والضيافة وسجل الجرد، وبيصفّر المخزون. الأصناف والأسعار والصور وعدد الحبات بيضلوا زي ما هم. استخدمه بعد التجربة وقبل أول يوم شغل.' : 'Deletes all sales, hospitality and stock history, and sets stock to zero. Items, prices and photos stay.'}</p>
@@ -910,6 +912,25 @@ async function freshStart() {
   delete S.settings.lastSync; S.settings.pendingReset = !!S.settings.sheetUrl; await saveSettings();
   render(); toast(A ? 'صار النظام نظيف · بداية جديدة' : 'Clean start');
   if (S.settings.pendingReset) syncNow(true);
+}
+async function exportCatalog() {
+  const data = { app: 'cafeteria-pos-items', at: new Date().toISOString(), catalog: catalogDoc() };
+  const n = Object.keys(S.items).length;
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+  a.download = `اصناف-MEU-Kiosk-${dayOf()}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(S.lang === 'ar' ? `نزل ملف فيه ${n} صنف · ابعته للجهاز الثاني` : `Saved ${n} items`);
+}
+async function importCatalog(file) {
+  const A = S.lang === 'ar';
+  try {
+    const data = JSON.parse(await file.text());
+    const cat = data.app === 'cafeteria-pos-items' || data.app === 'cafeteria-pos' ? data.catalog : null;
+    if (!cat || !cat.items || !Array.isArray(cat.groups)) throw new Error('file');
+    const n = Object.keys(cat.items).length, when = (data.at || '').slice(0, 16).replace('T', ' ');
+    if (!confirm(A ? `تحميل ${n} صنف من ملف ${when}؟ الأصناف والأسعار والمخزون والصور على هاد الجهاز بتصير زي الملف. المبيعات اللي على هاد الجهاز ما بتتغير.` : `Load ${n} items? Items, prices and stock here will match the file. Sales stay as they are.`)) return;
+    await DB.set('catalog', cat);
+    location.reload();
+  } catch (e) { toast(A ? 'الملف مش ملف أصناف صحيح' : 'Not a valid items file', true); }
 }
 async function restore(file) {
   const A = S.lang === 'ar';
@@ -984,6 +1005,7 @@ document.addEventListener('click', async (e) => {
       S.settings.pins[id] = h; await saveSettings(); $('#pNew-' + id).value = $('#pNew2-' + id).value = ''; toast(S.lang === 'ar' ? `تغيّرت كلمة سر ${who.ar}` : 'Password changed'); break;
     }
     case 'backup': backup(); break;
+    case 'exportCat': exportCatalog(); break;
     case 'saveLow': { const n = parseInt($('#lowB').value, 10); if (!(n >= 1 && n <= 20)) { toast(S.lang === 'ar' ? 'رقم من 1 لـ 20' : '1 to 20', true); break; } S.settings.lowBoxes = n; await saveSettings(); refreshHeader(); toast(S.lang === 'ar' ? `انحفظ: التنبيه لما يضل ${n} كرتونة` : 'Saved'); break; }
     case 'freshStart': askPin(S.lang === 'ar' ? 'لحماية البيانات من المسح بالغلط' : 'Protects your data from accidental deletion', freshStart, '0000', S.lang === 'ar' ? 'كلمة سر المسح' : 'Delete password'); break;
   }
@@ -999,6 +1021,7 @@ document.addEventListener('change', (e) => {
   if (el.dataset.date) { S.admin[el.dataset.date] = el.value; if (S.admin.from > S.admin.to) S.admin.to = S.admin.from; adminCache = null; rerenderAdmin(); }
   if (el.id === 'fImg' && el.files[0]) pickImage(el.files[0]);
   if (el.id === 'restoreIn' && el.files[0]) restore(el.files[0]);
+  if (el.id === 'catIn' && el.files[0]) importCatalog(el.files[0]);
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.dataset.chg) e.target.blur();
