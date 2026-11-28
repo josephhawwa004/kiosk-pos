@@ -437,3 +437,6 @@ html[data-theme=dark] .cpnote.ok{background:#12301C;color:#7EE2A0;border-color:#
 .discpick .segbtn b{font-size:24px;direction:ltr}
 .discpick .segbtn small{font-size:12px;opacity:.7}
 .discpick .segbtn:disabled{opacity:.35}
+.cashpick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.cashpick .segbtn{height:84px;font-size:22px}
+.hbtn.cashier b{color:#FF9A5C}

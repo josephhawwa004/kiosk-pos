@@ -191,6 +191,7 @@ async function loadAll() {
   S.settings = (await DB.get('settings')) || {};
   if (!S.settings.pin) { S.settings.pin = await sha('1234'); S.settings.lang = 'ar'; await DB.set('settings', S.settings); }
   if (!S.settings.pins) { S.settings.pins = { anas: await sha('1111'), lawrence: await sha('2222') }; await DB.set('settings', S.settings); }
+  if (!S.settings.pins.saleh) { S.settings.pins.saleh = await sha('3333'); await DB.set('settings', S.settings); }
   S.lang = S.settings.lang || 'ar';
   const today = await DB.salesRange(dayOf(), dayOf());
   S.dayCount = today.length;
@@ -260,6 +261,7 @@ function header() {
   return `<header class="top">
     <div class="brand"><div class="logo">${ICON.cup}</div><div><b>${esc(t('brand'))}</b><small>${S.view === 'admin' ? 'Admin' : esc(t('pos'))}</small></div></div>
     <div class="grow"></div>
+    ${S.view === 'sell' ? `<button class="hbtn cashier" data-act="pickCashier">${ICON.user || ''}<span>${S.lang === 'ar' ? 'الكاشير' : 'Cashier'}: <b>${esc(S.settings.cashier ? adminName(ADMINS.find((d) => d.id === S.settings.cashier).ar) : (S.lang === 'ar' ? 'سجّل دخول' : 'Sign in'))}</b></span></button>` : ''}
     <div class="pill"><span class="dot ${on ? 'on' : ''}"></span><span>${esc(on ? t('online') : t('offline'))}</span></div>
     <button class="pill" data-act="syncNow" style="color:#D4D5DA">${ICON.sync}<span>${esc(sheet)}</span></button>
     <button class="hbtn" data-act="openSheet">${S.lang === 'ar' ? 'افتح الشيت' : 'Open sheet'}</button>
@@ -318,7 +320,7 @@ function gridHtml() {
 const MERGES_V5 = [{"g": "super", "keep": "super-1", "ids": ["super-1", "super-2", "super-3", "super-4", "super-5"], "ar": null, "en": null, "img": "img/super-1.webp"}, {"g": "matrix", "keep": "matrix-1", "ids": ["matrix-1", "matrix-2", "matrix-3", "matrix-4", "matrix-5", "matrix-6", "matrix-7", "matrix-8", "matrix-9", "matrix-10"], "ar": null, "en": null, "img": "img/matrix-mix.webp"}, {"g": "kinza", "keep": "kinza", "ids": ["kinza", "kinza-2", "kinza-3", "kinza-4", "kinza-5"], "ar": "مشروب غازي", "en": "Soda", "img": "img/kinza-mix.webp"}, {"g": "monster", "keep": "monster-1", "ids": ["monster-1", "monster-2", "monster-3", "monster-4", "monster-5", "monster-6"], "ar": null, "en": null, "img": "img/monster-mix.webp"}, {"g": "luna", "keep": "luna-1", "ids": ["luna-1", "luna-2", "luna-3", "luna-4", "luna-5"], "ar": null, "en": null, "img": "img/luna-mix.webp"}, {"g": "redbull", "keep": "redbull-1", "ids": ["redbull-1", "redbull-2"], "ar": "عادي ولايت", "en": "Original & Lite", "img": "img/redbull-mix.webp"}];
 const MERGES_V7 = [{"g": "freez", "keep": "freez-1", "ids": ["freez-1", "freez-2", "freez-3", "freez-4", "freez-5"], "ar": null, "en": null, "img": "img/freez-mix.webp"}, {"g": "bansella", "keep": "bansella-1", "ids": ["bansella-1", "bansella-2"], "ar": null, "en": null, "img": "img/bansella-mix.webp"}, {"g": "rani", "keep": "rani-1", "ids": ["rani-1", "rani-2"], "ar": null, "en": null, "img": "img/rani-mix.webp"}, {"g": "tonic", "keep": "tonic-1", "ids": ["tonic-1", "tonic-2"], "ar": null, "en": null, "img": "img/tonic-mix.webp"}, {"g": "glass", "keep": "glass-1", "ids": ["glass-1", "glass-2", "glass-3"], "ar": null, "en": null, "img": "img/glass-mix.webp"}, {"g": "almaraiprotein", "keep": "almaraiprotein-1", "ids": ["almaraiprotein-1", "almaraiprotein-2", "almaraiprotein-3"], "ar": null, "en": null, "img": "img/almaraiprotein-mix.webp"}, {"g": "canary", "keep": "canary-1", "ids": ["canary-1", "canary-2", "canary-3", "canary-4"], "ar": null, "en": null, "img": "img/canary-mix.webp"}, {"g": "tasco", "keep": "tasco-1", "ids": ["tasco-1", "tasco-2"], "ar": null, "en": null, "img": "img/tasco-mix.webp"}, {"g": "mrbrown", "keep": "mrbrown-1", "ids": ["mrbrown-1", "mrbrown-2", "mrbrown-3", "mrbrown-4", "mrbrown-5"], "ar": null, "en": null, "img": "img/mrbrown-mix.webp"}, {"g": "icetea", "keep": "icetea-1", "ids": ["icetea-1", "icetea-2", "icetea-3", "icetea-4", "icetea-5", "icetea-6", "icetea-7", "icetea-8"], "ar": null, "en": null, "img": "img/icetea-mix.webp"}, {"g": "blu", "keep": "blu-1", "ids": ["blu-1", "blu-2", "blu-3", "blu-4"], "ar": null, "en": null, "img": "img/blu-mix.webp"}, {"g": "black", "keep": "black-1", "ids": ["black-1", "black-2"], "ar": null, "en": null, "img": "img/black-mix.webp"}, {"g": "landessa", "keep": "landessa-1", "ids": ["landessa-1", "landessa-2", "landessa-3", "landessa-4", "landessa-5"], "ar": null, "en": null, "img": "img/landessa-mix.webp"}];
 /* two admins; each one's password opens Admin, hospitality and the discount */
-const ADMINS = [{ id: 'anas', ar: 'أنس', en: 'Anas' }, { id: 'lawrence', ar: 'لورنس', en: 'Lawrence' }];
+const ADMINS = [{ id: 'anas', ar: 'أنس', en: 'Anas' }, { id: 'lawrence', ar: 'لورنس', en: 'Lawrence' }, { id: 'saleh', ar: 'صالح', en: 'Saleh' }];
 const DISC_AMTS = [250, 500, 750, 1000, 1500]; /* fixed discounts in fils */
 const cartSub = () => S.cart.reduce((a, l) => a + l.price * l.qty, 0);
 const cartDisc = () => (S.disc && S.cart.length ? Math.min(S.disc.amt, cartSub()) : 0);
@@ -406,6 +408,18 @@ function playCash(force) {
   } catch (e) { /* ignore */ }
 }
 document.addEventListener('pointerdown', () => { if (SND.ctx && SND.ctx.state === 'suspended') SND.ctx.resume(); }, true);
+
+/* ---------- cashier sign-in: each sale is recorded under the person on the till ---------- */
+function pickCashier() {
+  const A = A2(); S.modal = { kind: 'cashier' };
+  openModal(`<div class="modal narrow" role="dialog" aria-label="cashier">
+    <div class="mhead"><div class="grow"><b>${A ? 'مين على الكاش؟' : 'Who is on the till?'}</b><small>${A ? 'اختار اسمك وادخل كلمة سرك' : 'Pick your name and enter your password'}</small></div>${S.settings.cashier ? `<button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button>` : ''}</div>
+    <div class="mbody"><div class="cashpick">${ADMINS.map((d) => `<button class="segbtn ${S.settings.cashier === d.id ? 'on' : ''}" data-act="cashierAs" data-id="${d.id}">${esc(L(d.ar, d.en))}</button>`).join('')}</div></div></div>`);
+}
+function cashierAs(id) {
+  const d = ADMINS.find((x) => x.id === id), A = A2();
+  askPin(A ? 'لتسجيل الدخول على الكاش' : 'To sign in on the till', async () => { S.settings.cashier = id; await saveSettings(); render(); toast(A ? `أهلاً ${d.ar} · صرت على الكاش` : `Hi ${d.en}`); }, null, `${A ? 'كلمة سر' : 'Password'} ${L(d.ar, d.en)}`, id);
+}
 
 /* ---------- fixed discount amounts, chosen after the admin password ---------- */
 function openDiscPick(who) {
@@ -495,6 +509,7 @@ async function saveSale(type, who) {
   const sale = { id: now.toString(36) + '-' + Math.random().toString(36).slice(2, 6), ts: now, day: dayOf(new Date(now)), no: S.dayCount + 1, type, pay: type === 'sale' ? S.pay : null, given: type === 'sale' && S.pay === 'cash' ? S.given : null, lines, total, cost, voided: false, syncedFlag: 0 };
   if (disc) Object.assign(sale, { sub, disc, discAmt: disc, by: S.disc.by });
   if (type === 'hosp' && who) sale.by = who;
+  if (S.settings.cashier) sale.cashier = ADMINS.find((d) => d.id === S.settings.cashier).ar;
   if (type === 'sale' && S.cashPart) {
     if (S.pay === 'cash' || S.cashPart >= total) { toast(A2() ? 'اختار فيزا أو كليك للمبلغ الباقي' : 'Pick Visa or CliQ for the rest', true); return; }
     sale.split = { cash: S.cashPart, [S.pay]: total - S.cashPart };
@@ -528,8 +543,8 @@ function toast(msg, bad, ms) {
   $('#toast').innerHTML = `<div class="toast ${bad ? 'bad' : ''}" role="status"><span class="ok">${bad ? ICON.x.replace('currentColor', '#fff') : ICON.check}</span><span>${esc(msg)}</span></div>`;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('#toast').innerHTML = ''; }, ms || 2600);
 }
-function askPin(sub, onOk, code, title) {
-  S.modal = { kind: 'pin', val: '', sub, onOk, err: '', code, title };
+function askPin(sub, onOk, code, title, only) {
+  S.modal = { kind: 'pin', val: '', sub, onOk, err: '', code, title, only };
   drawPin();
 }
 function drawPin() {
@@ -546,7 +561,7 @@ async function pinKey(k) {
   if (k === 'del') m.val = m.val.slice(0, -1);
   else if (k === 'ok') {
     if (m.code) { if (m.val === m.code) { const cb = m.onOk; closeModal(); cb(); return; } }
-    else { const h = await sha(m.val), who = ADMINS.find((d) => (S.settings.pins || {})[d.id] === h); if (who) { const cb = m.onOk; closeModal(); cb(who.ar); return; } }
+    else { const h = await sha(m.val), who = ADMINS.find((d) => (!m.only || d.id === m.only) && (S.settings.pins || {})[d.id] === h); if (who) { const cb = m.onOk; closeModal(); cb(who.ar); return; } }
     m.err = t('wrongPin'); m.val = '';
   } else if (m.val.length < 8) { m.val += k; m.err = ''; }
   drawPin();
@@ -751,8 +766,9 @@ function aggregate(sales) {
   sold.forEach((s) => s.lines.forEach((l) => { const k = l.id; const o = byItem[k] || (byItem[k] = { name: l.name, qty: 0, rev: 0, cost: 0 }); o.qty += l.qty; o.rev += lineNet(l); o.cost += (l.cost || 0) * l.qty; }));
   const byDay = {};
   live.forEach((s) => { const o = byDay[s.day] || (byDay[s.day] = { day: s.day, orders: 0, rev: 0, cost: 0, hospSell: 0, hospCost: 0, cash: 0, visa: 0, cliq: 0 }); if (s.type === 'sale') { o.orders++; o.rev += s.total; o.cost += s.cost; if (s.split) PAYS.forEach((p) => { o[p] += s.split[p] || 0; }); else o[s.pay] += s.total; } else { o.hospSell += s.total; o.hospCost += s.cost; } });
+  const byCashier = {}; sold.forEach((s) => { const k = s.cashier || '—'; const o = byCashier[k] || (byCashier[k] = { orders: 0, rev: 0 }); o.orders++; o.rev += s.total; });
   const disc = sold.reduce((a, s) => a + (s.disc || 0), 0), discN = sold.filter((s) => s.disc).length;
-  return { sold, hosp, rev, cogs, hospSell, hospCost, profit: rev - cogs - hospCost, byPay, byItem, byDay, orders: sold.length, disc, discN };
+  return { sold, hosp, rev, cogs, hospSell, hospCost, profit: rev - cogs - hospCost, byPay, byItem, byDay, orders: sold.length, disc, discN, byCashier };
 }
 function dateBar() {
   const A = S.lang === 'ar';
@@ -776,7 +792,8 @@ function reportTab(kind) {
         <div class="kpi"><span>${A ? 'تكلفة اللي انباع' : 'Cost of goods'}</span><b class="num">${jd(ag.cogs)}</b><small>${esc(t('jd'))}</small></div>
         <div class="kpi"><span>${A ? 'الضيافة (بالتكلفة)' : 'Hospitality (cost)'}</span><b class="num neg">-${jd(ag.hospCost)}</b><small>${A ? 'بسعر البيع' : 'at price'}: -${jd(ag.hospSell)}</small></div>
         <div class="kpi"><span>${A ? 'صافي الربح' : 'Net profit'}</span><b class="num ${ag.profit >= 0 ? 'pos' : 'neg'}">${jd(ag.profit)}</b><small>${esc(t('jd'))}</small></div></div>
-      <div class="cols"><div class="card"><h2>${A ? 'حسب طريقة الدفع' : 'By payment'}</h2><div class="bars">${bars}</div><div class="drawer"><span>${A ? 'لازم يكون بالدرج كاش' : 'Cash expected in drawer'}</span><span class="num">${jd(ag.byPay.cash || 0)} ${esc(t('jd'))}</span></div></div>
+      <div class="cols"><div class="card"><h2>${A ? 'حسب طريقة الدفع' : 'By payment'}</h2><div class="bars">${bars}</div><div class="drawer"><span>${A ? 'لازم يكون بالدرج كاش' : 'Cash expected in drawer'}</span><span class="num">${jd(ag.byPay.cash || 0)} ${esc(t('jd'))}</span></div>
+          <h2 style="margin-top:16px">${A ? 'حسب الكاشير' : 'By cashier'}</h2><div class="bars">${Object.entries(ag.byCashier).map(([k, o]) => `<div class="drawer" style="margin-top:6px"><span>${esc(adminName(k))} · ${o.orders} ${A ? 'طلب' : 'orders'}</span><span class="num">${jd(o.rev)} ${esc(t('jd'))}</span></div>`).join('') || `<small style="color:var(--muted)">—</small>`}</div></div>
         <div class="card"><h2>${A ? 'الأصناف المباعة' : 'Items sold'}</h2><div class="scroll" style="max-height:360px"><table class="tbl"><thead><tr><th class="s">${A ? 'الصنف' : 'Item'}</th><th>${A ? 'الكمية' : 'Qty'}</th><th>${A ? 'الإيراد' : 'Revenue'}</th><th>${A ? 'التكلفة' : 'Cost'}</th><th>${A ? 'الربح' : 'Profit'}</th></tr></thead><tbody>${trs || `<tr><td colspan="5" style="height:80px;color:var(--muted)">${A ? 'ما في مبيعات' : 'No sales'}</td></tr>`}</tbody></table></div></div></div>`;
   }
   if (kind === 'hosp') {
@@ -786,7 +803,7 @@ function reportTab(kind) {
       <div class="card"><table class="tbl"><thead><tr><th>${A ? 'الوقت' : 'Time'}</th><th class="s">${A ? 'الصنف' : 'Item'}</th><th>${A ? 'الكمية' : 'Qty'}</th><th>${A ? 'بسعر البيع' : 'At price'}</th><th>${A ? 'التكلفة' : 'Cost'}</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="5" style="height:80px;color:var(--muted)">${A ? 'ما في ضيافة' : 'None'}</td></tr>`}<tr><td></td><td class="s"><b>${A ? 'المجموع' : 'Total'}</b></td><td></td><td class="num neg">-${jd(ag.hospSell)}</td><td class="num">${jd(ag.hospCost)}</td></tr></tbody></table></div>`;
   }
-  const rows = adminCache.sales.map((s) => `<tr class="${s.voided ? 'voided' : ''}"><td class="num">#${s.no}</td><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(s.lines.map((l) => `${l.name} ×${l.qty}`).join('، '))}</td>
+  const rows = adminCache.sales.map((s) => `<tr class="${s.voided ? 'voided' : ''}"><td class="num">#${s.no}${s.cashier ? `<br><small style="color:var(--muted)">${esc(adminName(s.cashier))}</small>` : ''}</td><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(s.lines.map((l) => `${l.name} ×${l.qty}`).join('، '))}</td>
     <td>${s.type === 'hosp' ? `<span class="tag h">${esc(t('hosp'))}${s.by ? ' · ' + esc(adminName(s.by)) : ''}</span>` : `<span class="tag">${esc(s.split ? t('split') + ': ' + splitText(s.split, A) : t(s.pay))}</span>`}${s.disc ? ` <span class="tag d">${esc(t('disc'))} ${s.discPct ? s.discPct + '%' : jd(s.disc)} · ${esc(adminName(s.by))}</span>` : ''}</td><td class="num ${s.type === 'hosp' ? 'neg' : ''}">${s.type === 'hosp' ? '-' : ''}${jd(s.total)}</td>
     <td>${s.voided ? (A ? 'ملغي' : 'Void') : `<button class="btn sm danger" data-act="void" data-id="${s.id}">${A ? 'إلغاء' : 'Void'}</button>`}</td></tr>`).join('');
   return `<div class="ahead"><div><h1>${esc(t('tSales'))}</h1><p>${A ? 'إلغاء أي طلب بيرجّع الكمية للمخزون وبيشيله من الحسابات' : 'Voiding returns the stock and removes it from totals'}</p></div><div class="actions">${exportBtns}</div></div>
@@ -878,6 +895,7 @@ async function exportExcel() {
     { title: 'الأرقام الرئيسية', head: ['البند', 'القيمة (د.أ)', '', ''], money: [1], intRows: [0], rows: [
       ['عدد الطلبات', ag.orders, '', ''], ['إجمالي المبيعات (بعد الخصم)', r3(ag.rev), '', ''], ['الخصومات', -r3(ag.disc), '', ''], ['تكلفة اللي انباع', r3(ag.cogs), '', ''],
       ['الضيافة بسعر البيع', -r3(ag.hospSell), '', ''], ['الضيافة بالتكلفة', -r3(ag.hospCost), '', '']], total: ['صافي الربح', r3(ag.profit), '', ''] },
+    { title: 'حسب الكاشير', head: ['الكاشير', 'الطلبات', 'المبيعات (د.أ)', ''], money: [2], rows: Object.entries(ag.byCashier).map(([k, o]) => [k, o.orders, r3(o.rev), '']) },
     { title: 'حسب طريقة الدفع', head: ['طريقة الدفع', 'المبلغ (د.أ)', 'النسبة', ''], money: [1], rows: payRows, total: ['المجموع', r3(ag.rev), '100%', ''] },
     { title: 'الأكثر مبيعاً', head: ['الصنف', 'الكمية', 'الإيراد (د.أ)', 'الربح (د.أ)'], money: [2, 3], rows: top },
   ], [36, 24, 22, 22]);
@@ -886,11 +904,11 @@ async function exportExcel() {
   const det = [];
   sales.forEach((s) => s.lines.forEach((l) => {
     const h = s.type === 'hosp', gross = l.price * l.qty, tot = h ? gross : lineNet(l), c = (l.cost || 0) * l.qty;
-    det.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), s.disc ? -r3(gross - tot) : '', h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : (s.split ? 'مقسوم: ' + splitText(s.split) : payName[s.pay]), l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c), s.by || '']);
+    det.push([s.day, timeOf(s.ts), s.no, l.nameAr || l.name, l.qty, r3(l.price), s.disc ? -r3(gross - tot) : '', h ? -r3(tot) : r3(tot), h ? 'ضيافة' : 'بيع', h ? '' : (s.split ? 'مقسوم: ' + splitText(s.split) : payName[s.pay]), l.cost == null ? '' : r3(l.cost), r3(c), h ? -r3(c) : r3(tot - c), s.by || '', s.cashier || '']);
   }));
-  sheet('المبيعات التفصيلية', [{ head: ['التاريخ', 'الوقت', 'رقم الطلب', 'الصنف', 'الكمية', 'سعر الحبة', 'الخصم', 'المجموع', 'النوع', 'طريقة الدفع', 'تكلفة الحبة', 'التكلفة', 'الربح', 'الأدمن'],
-    money: [5, 6, 7, 10, 11, 12], rows: det, total: ['المجموع', '', '', '', sum(det, 4), '', r3(Math.round(sum(det, 6) * 1000)), r3(Math.round(sum(det, 7) * 1000)), '', '', '', r3(Math.round(sum(det, 11) * 1000)), r3(Math.round(sum(det, 12) * 1000)), ''] }],
-  [18, 12, 14, 40, 12, 16, 14, 16, 14, 16, 16, 16, 16, 14]);
+  sheet('المبيعات التفصيلية', [{ head: ['التاريخ', 'الوقت', 'رقم الطلب', 'الصنف', 'الكمية', 'سعر الحبة', 'الخصم', 'المجموع', 'النوع', 'طريقة الدفع', 'تكلفة الحبة', 'التكلفة', 'الربح', 'الأدمن', 'الكاشير'],
+    money: [5, 6, 7, 10, 11, 12], rows: det, total: ['المجموع', '', '', '', sum(det, 4), '', r3(Math.round(sum(det, 6) * 1000)), r3(Math.round(sum(det, 7) * 1000)), '', '', '', r3(Math.round(sum(det, 11) * 1000)), r3(Math.round(sum(det, 12) * 1000)), '', ''] }],
+  [18, 12, 14, 40, 12, 16, 14, 16, 14, 16, 16, 16, 16, 14, 14]);
 
   /* 3. items */
   const items = Object.values(ag.byItem).sort((a, b) => b.rev - a.rev).map((o) => [o.name, o.qty, r3(o.rev), r3(o.cost), r3(o.rev - o.cost)]);
@@ -927,9 +945,10 @@ async function exportExcel() {
 let syncing = false, syncTimer;
 function syncSoon(ms = 1500) { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, ms); }
 /* the sheet shows each line at its price after discount, and who gave a discount or hospitality */
-function forSheet(s) {
+function forSheet(s0) {
+  const s = s0.cashier ? Object.assign({}, s0, { lines: s0.lines.map((l) => Object.assign({}, l, { nameAr: `${l.nameAr || l.name} [${s0.cashier}]` })) }) : s0;
   if (s.split) {
-    const base = s.disc || s.by ? forSheet(Object.assign({}, s, { split: null })) : s;
+    const base = s.disc || s.by ? forSheet(Object.assign({}, s, { split: null, cashier: null })) : s;
     const parts = PAYS.filter((p) => s.split[p]);
     return parts.map((p) => { const f = s.split[p] / s.total; return Object.assign({}, base, { pay: p, total: s.split[p], lines: base.lines.map((l) => Object.assign({}, l, { nameAr: (l.nameAr || l.name) + ' (مقسوم)', price: l.price * f, cost: l.cost == null ? null : l.cost * f })) }); });
   }
@@ -1104,10 +1123,13 @@ document.addEventListener('click', async (e) => {
     case 'spOk': if (cartTotal() === splitSum()) { closeModal(); saveSale('sale'); } break;
     case 'given': S.given = +el.dataset.v; rerenderCart(); break;
     case 'checkout':
+      if (!S.settings.cashier) { pickCashier(); break; }
       if (S.cashPart && S.pay === 'cash') { toast(A2() ? 'اختار فيزا أو كليك للمبلغ الباقي' : 'Pick Visa or CliQ for the rest', true); break; }
       saveSale('sale'); break;
     case 'hosp': askPin(t('pinHosp'), (who) => saveSale('hosp', who)); break;
     case 'disc': if (S.cart.length && !S.disc) askPin(t('pinDisc'), (who) => openDiscPick(who)); break;
+    case 'pickCashier': pickCashier(); break;
+    case 'cashierAs': cashierAs(id); break;
     case 'discAmt': { const v = +el.dataset.v; closeModal(); S.disc = { amt: v, by: S.discWho }; S.given = null; S.cashPart = null; rerenderCart(); break; }
     case 'rmDisc': S.disc = null; S.given = null; S.cashPart = null; rerenderCart(); break;
     case 'pin': pinKey(el.dataset.k); break;
@@ -1141,13 +1163,14 @@ document.addEventListener('click', async (e) => {
     case 'tiles': S.settings.tiles = el.dataset.id; await saveSettings(); render(); break;
     case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = cleanKey($('#sKey').value); S.settings.sheetUrl = S.settings.sheetUrl.replace(/\s+/g, ''); S.settings.sheetView = $('#sView').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
     case 'savePin': {
-      const id = el.dataset.id, who = ADMINS.find((d) => d.id === id), other = ADMINS.find((d) => d.id !== id);
+      const id = el.dataset.id, who = ADMINS.find((d) => d.id === id), h0 = null; const others = ADMINS.filter((d) => d.id !== id);
       const a1 = $('#pNew-' + id).value, a2 = $('#pNew2-' + id).value;
       if (!/^\d{4,8}$/.test(a1)) { toast(S.lang === 'ar' ? 'لازم 4 لـ 8 أرقام' : '4 to 8 digits', true); break; }
       if (a1 !== a2) { toast(S.lang === 'ar' ? 'الكلمتين مش متطابقات' : 'They do not match', true); break; }
       if (a1 === '0000') { toast(S.lang === 'ar' ? '0000 محجوزة لكبسة المسح، اختار غيرها' : '0000 is reserved, pick another', true); break; }
       const h = await sha(a1);
-      if (other && S.settings.pins[other.id] === h) { toast(S.lang === 'ar' ? `هاي كلمة سر ${other.ar}، اختار وحدة مختلفة` : 'That is the other admin\'s password', true); break; }
+      const other = others.find((d) => S.settings.pins[d.id] === h);
+      if (other) { toast(S.lang === 'ar' ? `هاي كلمة سر ${other.ar}، اختار وحدة مختلفة` : 'That is another admin\'s password', true); break; }
       S.settings.pins[id] = h; await saveSettings(); $('#pNew-' + id).value = $('#pNew2-' + id).value = ''; toast(S.lang === 'ar' ? `تغيّرت كلمة سر ${who.ar}` : 'Password changed'); break;
     }
     case 'backup': backup(); break;
@@ -1186,6 +1209,7 @@ setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0
     S.today = dayOf();
     render();
     loadSound();
+    setTimeout(() => { if (!S.settings.cashier && !S.modal) pickCashier(); }, 400);
     setTimeout(() => { if (navigator.onLine) syncNow(); }, 3000);
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
