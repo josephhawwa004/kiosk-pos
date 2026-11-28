@@ -986,6 +986,8 @@ ${ADMINS.map((d) => `    <div class="setcard"><h3>${A ? 'كلمة سر' : 'Passw
     <div class="setcard"><h3>${A ? 'تنبيه المخزون' : 'Low stock alert'}</h3><p>${A ? 'النظام بينبهك لما يضل من الصنف هالعدد من الكراتين أو أقل: بعد البيعة مباشرة، وبرقم أحمر على زر Admin، وبفلتر "قربت تخلص".' : 'Alert when this many boxes or fewer are left.'}</p>
       <div class="field"><label for="lowB">${A ? 'نبّهني لما يضل (كرتونة)' : 'Alert at (boxes)'}</label><input class="inp c num" id="lowB" type="number" inputmode="numeric" min="1" max="20" value="${lowBoxes()}"></div>
       <button class="btn primary" data-act="saveLow">${A ? 'حفظ' : 'Save'}</button></div>
+    <div class="setcard"><h3>${A ? 'تحديث النظام' : 'Update the app'}</h3><p>${A ? 'إذا في تعديل جديد وما ظهر على هاد الجهاز، اكبس هون. المبيعات والأصناف والأسعار ما بتتأثر.' : 'Get the newest version now. Sales and items are kept.'} <span class="num" style="opacity:.6">v${SEED.version}</span></p>
+      <button class="btn primary" data-act="forceUpdate">${A ? 'حدّث النظام الآن' : 'Update now'}</button></div>
     <div class="setcard"><h3>${A ? 'نقل الأصناف لجهاز ثاني' : 'Copy items to another device'}</h3><p>${A ? 'كل جهاز إله ذاكرته. عشان تنقل الأصناف والأسعار والمخزون والصور من جهاز لجهاز: نزّل ملف الأصناف هون، وابعته للجهاز الثاني (واتساب أو إيميل)، وافتحه هناك من "حمّل ملف الأصناف". المبيعات على كل جهاز ما بتتغير.' : 'Each device keeps its own items. Download the items file here and load it on the other device. Sales are not touched.'}</p>
       <div class="actions"><button class="btn dark" data-act="exportCat" style="flex:1">${A ? 'نزّل ملف الأصناف' : 'Download items file'}</button><label class="btn" style="flex:1">${A ? 'حمّل ملف الأصناف' : 'Load items file'}<input type="file" accept=".json,application/json" id="catIn" class="sr"></label></div></div>
     <div class="setcard"><h3>${A ? 'نسخة احتياطية' : 'Backup'}</h3><p>${A ? 'نزّل ملف فيه كل شي: الأصناف والأسعار والمخزون وكل المبيعات. احفظه بمكان ثاني، وبترجّعه على أي جهاز.' : 'Download a file with everything. Restore it on any device.'}</p>
@@ -1021,6 +1023,20 @@ async function freshStart() {
   delete S.settings.lastSync; S.settings.pendingReset = !!S.settings.sheetUrl; await saveSettings();
   render(); toast(A ? 'صار النظام نظيف · بداية جديدة' : 'Clean start');
   if (S.settings.pendingReset) syncNow(true);
+}
+/* get the newest version now: only the app's saved files are cleared, sales and items stay */
+async function forceUpdate() {
+  const A = S.lang === 'ar';
+  if (!navigator.onLine) { toast(A ? 'لازم إنترنت للتحديث' : 'Internet needed', true); return; }
+  if (S.cart.length) { toast(A ? 'فضّي السلة أول' : 'Empty the cart first', true); return; }
+  toast(A ? 'عم يحدّث...' : 'Updating...');
+  try {
+    const regs = navigator.serviceWorker ? await navigator.serviceWorker.getRegistrations() : [];
+    await Promise.all(regs.map((r) => r.unregister()));
+    const keys = window.caches ? await caches.keys() : [];
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  } catch (e) { /* reload anyway */ }
+  location.replace(location.pathname + '?v=' + Date.now());
 }
 async function exportCatalog() {
   const data = { app: 'cafeteria-pos-items', at: new Date().toISOString(), catalog: catalogDoc() };
@@ -1107,6 +1123,7 @@ document.addEventListener('click', async (e) => {
     case 'openSheet': openSheet(); break;
     case 'toggleSound': S.settings.sound = S.settings.sound === false; await saveSettings(); render(); if (S.settings.sound) playCash(); break;
     case 'testSound': playCash(true); break;
+    case 'forceUpdate': forceUpdate(); break;
     case 'tiles': S.settings.tiles = el.dataset.id; await saveSettings(); render(); break;
     case 'saveSheet': S.settings.sheetUrl = $('#sUrl').value.trim(); S.settings.sheetKey = cleanKey($('#sKey').value); S.settings.sheetUrl = S.settings.sheetUrl.replace(/\s+/g, ''); S.settings.sheetView = $('#sView').value.trim(); await saveSettings(); toast(S.lang === 'ar' ? 'انحفظ' : 'Saved'); refreshHeader(); syncSoon(300); break;
     case 'savePin': {
@@ -1159,7 +1176,12 @@ setInterval(() => { if (dayOf() !== S.today) { S.today = dayOf(); S.dayCount = 0
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && location.protocol !== 'file:') {
       const hadOld = !!navigator.serviceWorker.controller;
-      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => { reg.update().catch(() => {}); setInterval(() => reg.update().catch(() => {}), 30 * 60000); }).catch(() => {});
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+        const check = () => { if (navigator.onLine) reg.update().catch(() => {}); };
+        check(); setInterval(check, 2 * 60000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+        window.addEventListener('online', check);
+      }).catch(() => {});
       /* a new version was installed: switch to it as soon as the cashier is not in the middle of an order */
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (!hadOld) return;
