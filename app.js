@@ -168,6 +168,7 @@ async function loadAll() {
   if (cat.seedVersion < 17) { /* v17: Barista section first, above Water */
     if (!cat.cats.some((c) => c.id === 'barista')) cat.cats.unshift({ id: 'barista', ar: 'باريستا', en: 'Barista' });
   }
+  if (cat.seedVersion < SEED.version) SEED.cats.forEach((c) => { if (!cat.cats.some((x) => x.id === c.id)) cat.cats.push(c); }); /* new sections */
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
