@@ -199,10 +199,12 @@ const groupOf = (it) => S.groups.find((g) => g.id === it.groupId);
 const itemsOf = (gid) => Object.values(S.items).filter((i) => i.groupId === gid).sort((a, b) => a.order - b.order);
 const itemName = (it) => { const g = groupOf(it); const gn = g ? L(g.ar, g.en) : ''; const vn = L(it.ar, it.en); return vn ? `${gn} - ${vn}` : gn; };
 const unitCost = (it) => (it.units > 0 && it.box != null ? it.box / it.units : null);
-const isAvail = (it) => !it.off && it.stock > 0 && it.sell > 0;
+/* barista drinks have a name and a price only: no stock, no box cost */
+const isBarista = (it) => { const g = it && S.groups.find((x) => x.id === it.groupId); return !!g && g.cat === 'barista'; };
+const isAvail = (it) => !it.off && it.sell > 0 && (isBarista(it) || it.stock > 0);
 const lowBoxes = () => (S.settings.lowBoxes > 0 ? S.settings.lowBoxes : 2);
 const lowLimit = (it) => (it.units > 0 ? it.units * lowBoxes() : 10 * lowBoxes());
-const lowItems = () => Object.values(S.items).filter((i) => !i.off && i.sell > 0 && i.stock > 0 && i.stock <= lowLimit(i));
+const lowItems = () => Object.values(S.items).filter((i) => !isBarista(i) && !i.off && i.sell > 0 && i.stock > 0 && i.stock <= lowLimit(i));
 function groupMatches(g, q) {
   if (!q) return true;
   const hay = [g.ar, g.en, ...itemsOf(g.id).flatMap((i) => [i.ar, i.en])].filter(Boolean).join(' ').toLowerCase();
@@ -360,7 +362,7 @@ function addToCart(id) {
   const it = S.items[id];
   if (!it || !isAvail(it)) return;
   const inCart = S.cart.filter((l) => l.id === id).reduce((a, l) => a + l.qty, 0);
-  if (inCart >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock} من ${itemName(it)}` : `Only ${it.stock} left`, true); return; }
+  if (!isBarista(it) && inCart >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock} من ${itemName(it)}` : `Only ${it.stock} left`, true); return; }
   const l = S.cart.find((x) => x.id === id);
   if (l) l.qty++; else S.cart.push({ id, name: itemName(it), price: it.sell, qty: 1 });
   S.given = null; S.cashPart = null;
@@ -464,7 +466,7 @@ function setSplit(vals) { PAYS.forEach((p) => { S.split[p] = vals[p] ? (vals[p] 
 /* ---------- saving sales (one atomic write: sale + stock) ---------- */
 async function saveSale(type, who) {
   if (!S.cart.length) return;
-  for (const l of S.cart) { const it = S.items[l.id]; if (!it || it.stock < l.qty) { toast(S.lang === 'ar' ? 'المخزون ما بيكفي' : 'Not enough stock', true); return; } }
+  for (const l of S.cart) { const it = S.items[l.id]; if (!it || (!isBarista(it) && it.stock < l.qty)) { toast(S.lang === 'ar' ? 'المخزون ما بيكفي' : 'Not enough stock', true); return; } }
   const now = Date.now();
   const lines = S.cart.map((l) => { const it = S.items[l.id]; const c = unitCost(it); return { id: l.id, name: itemName(it), nameAr: (() => { const g = groupOf(it); return it.ar ? `${g.ar} - ${it.ar}` : g.ar; })(), qty: l.qty, price: l.price, cost: c == null ? null : Math.round(c * 1000) / 1000 }; });
   const sub = lines.reduce((a, l) => a + l.price * l.qty, 0);
@@ -483,7 +485,7 @@ async function saveSale(type, who) {
     sale.split = { cash: S.cashPart, [S.pay]: total - S.cashPart };
   }
   const items = JSON.parse(JSON.stringify(S.items));
-  for (const l of lines) items[l.id].stock -= l.qty;
+  for (const l of lines) if (!isBarista(items[l.id])) items[l.id].stock -= l.qty;
   try {
     await DB.tx(['kv', 'sales'], 'readwrite', (tx) => {
       tx.objectStore('kv').put({ cats: S.cats, groups: S.groups, items, seedVersion: SEED.version }, 'catalog');
@@ -559,14 +561,14 @@ function itemsTab() {
   const q = S.admin.q.trim();
   const all = Object.values(S.items);
   const onN = all.filter(isAvail).length, lowN = lowItems().length;
-  const needN = all.filter((i) => !(i.sell > 0) || !(i.units > 0)).length;
+  const needN = all.filter((i) => !(i.sell > 0) || (!isBarista(i) && !(i.units > 0))).length;
   const chips = [{ id: 'all', ar: 'الكل', en: 'All' }, ...S.cats, { id: 'need', ar: 'ناقصها معلومات', en: 'Missing info' }, { id: 'low', ar: 'قربت تخلص', en: 'Low stock' }]
     .map((c) => `<button class="chip ${S.admin.cat === c.id ? 'on' : ''}" data-act="acat" data-id="${c.id}">${esc(L(c.ar, c.en))}</button>`).join('');
   const gs = S.groups.filter((g) => (S.admin.cat === 'all' || ['need', 'low'].includes(S.admin.cat) || g.cat === S.admin.cat) && groupMatches(g, q)).sort((a, b) => a.order - b.order);
   let rows = '';
   for (const g of gs) {
     let its = itemsOf(g.id);
-    if (S.admin.cat === 'need') its = its.filter((i) => !(i.sell > 0) || !(i.units > 0));
+    if (S.admin.cat === 'need') its = its.filter((i) => !(i.sell > 0) || (!isBarista(i) && !(i.units > 0)));
     if (S.admin.cat === 'low') its = its.filter((i) => i.stock > 0 && i.stock <= lowLimit(i));
     if (!its.length) continue;
     if (its.length > 1) rows += `<tr class="grp"><td colspan="8" class="s"><div class="namecell"><input class="nameinp grpname" id="gname-${g.id}" value="${esc(g.ar)}" data-chg="gname" data-id="${g.id}" aria-label="group name"><span>${esc(t('flavors', its.length))}</span></div></td></tr>`;
@@ -1056,7 +1058,7 @@ document.addEventListener('click', async (e) => {
     case 'tile': { const its = itemsOf(id); if (its.length === 1) addToCart(its[0].id); else flavorSheet(id); break; }
     case 'addItem': addToCart(id); break;
     case 'closeModal': closeModal(); break;
-    case 'inc': { const l = S.cart[+el.dataset.i]; const it = S.items[l.id]; if (l.qty >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock}` : `Only ${it.stock} left`, true); break; } l.qty++; S.given = null; S.cashPart = null; rerenderCart(); break; }
+    case 'inc': { const l = S.cart[+el.dataset.i]; const it = S.items[l.id]; if (!isBarista(it) && l.qty >= it.stock) { toast(S.lang === 'ar' ? `ما ضل غير ${it.stock}` : `Only ${it.stock} left`, true); break; } l.qty++; S.given = null; S.cashPart = null; rerenderCart(); break; }
     case 'dec': { const i = +el.dataset.i; if (S.cart[i].qty > 1) S.cart[i].qty--; else S.cart.splice(i, 1); S.given = null; S.cashPart = null; rerenderCart(); break; }
     case 'clearCart': S.cart = []; S.given = null; S.cashPart = null; S.disc = null; rerenderCart(); break;
     case 'pay': if (id === 'cash') { if (S.cart.length) openCashPad(); else { S.pay = 'cash'; rerenderCart(); } break; } S.pay = id; S.given = null; rerenderCart(); break;
