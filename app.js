@@ -618,7 +618,7 @@ ${isBarista(it) ? `<td class="num" style="color:var(--muted)">—</td><td class=
 ${isBarista(it) ? `<td class="num" style="color:var(--muted)">—</td>` : `        <td class="num ${p == null ? '' : p >= 0 ? 'pos' : 'neg'}">${p == null ? '—' : jd(p)}</td>
 `}
 ${isBarista(it) ? `<td class="num" style="color:var(--muted)">${S.lang === 'ar' ? 'مفتوح' : 'Always open'}</td>` : `        <td><div class="stk"><div class="v"><span class="num ${stCls}">${st} ${S.lang === 'ar' ? 'حبة' : 'pcs'}</span><small>${esc(bx)}</small></div>
-          <div class="bs"><button class="btn sm" data-act="stock" data-mode="box" data-id="${it.id}" ${it.units > 0 ? '' : 'disabled'}>+ ${S.lang === 'ar' ? 'صندوق' : 'Box'}</button><button class="btn sm" data-act="stock" data-mode="piece" data-id="${it.id}">+ ${S.lang === 'ar' ? 'حبة' : 'Pcs'}</button></div>
+          <div class="bs"><button class="btn sm" data-act="stock" data-mode="box" data-id="${it.id}">+ ${S.lang === 'ar' ? 'صندوق' : 'Box'}</button><button class="btn sm" data-act="stock" data-mode="piece" data-id="${it.id}">+ ${S.lang === 'ar' ? 'حبة' : 'Pcs'}</button></div>
           <button class="btn sm" data-act="stock" data-mode="set" data-id="${it.id}" title="جرد">${S.lang === 'ar' ? 'جرد' : 'Count'}</button></div></td>
 `}
         <td><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="toggle" data-id="${it.id}"><i></i><span>${on ? 'ON' : 'OFF'}</span></button></td></tr>`;
@@ -664,8 +664,9 @@ function stockModal(id, mode) {
     <div class="mhead"><div class="mimg"><img src="${esc(it.img)}" alt=""></div><div class="grow"><b>${esc(title)}</b><small>${esc(itemName(it))} · ${S.lang === 'ar' ? 'الحالي' : 'now'}: ${it.stock}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
     <div class="mbody">
       ${quick.length ? `<div class="seg seg5">${quick.map((n) => `<button class="segbtn" data-act="qset" data-v="${n}">${n}</button>`).join('')}</div>` : ''}
-      <div class="field"><label for="qtyIn">${mode === 'box' ? (S.lang === 'ar' ? `عدد الصناديق (كل صندوق ${it.units} حبة)` : `Boxes (${it.units} pcs each)`) : (S.lang === 'ar' ? 'عدد الحبات' : 'Pieces')}</label>
+      <div class="field"><label for="qtyIn">${mode === 'box' ? (it.units > 0 ? (S.lang === 'ar' ? `عدد الصناديق (كل صندوق ${it.units} حبة)` : `Boxes (${it.units} pcs each)`) : (S.lang === 'ar' ? 'عدد الصناديق' : 'Boxes')) : (S.lang === 'ar' ? 'عدد الحبات' : 'Pieces')}</label>
         <input class="inp c num" id="qtyIn" type="number" inputmode="numeric" min="0" value="${mode === 'set' ? it.stock : 1}"></div>
+      ${mode === 'box' && !(it.units > 0) ? `<div class="field"><label for="unitsIn">${S.lang === 'ar' ? 'كم حبة بالصندوق؟ (بنحفظها للمرات الجاية)' : 'Pieces per box? (saved for next time)'}</label><input class="inp c num" id="unitsIn" type="number" inputmode="numeric" min="1" placeholder="؟"></div>` : ''}
       <div class="actions"><button class="btn" data-act="closeModal" style="flex:1">${esc(t('cancel'))}</button><button class="btn primary" data-act="stockOk" style="flex:2">${esc(t('ok'))}</button></div></div></div>`);
   setTimeout(() => { const i = $('#qtyIn'); if (i) { i.focus(); i.select(); } }, 50);
 }
@@ -673,6 +674,11 @@ async function stockOk() {
   const m = S.modal, it = S.items[m.id];
   const n = parseInt($('#qtyIn').value, 10);
   if (isNaN(n) || n < 0) { toast(S.lang === 'ar' ? 'رقم غلط' : 'Invalid number', true); return; }
+  if (m.mode === 'box' && !(it.units > 0)) {
+    const u = parseInt(($('#unitsIn') || {}).value, 10);
+    if (isNaN(u) || u <= 0) { toast(S.lang === 'ar' ? 'اكتب كم حبة بالصندوق' : 'Enter pieces per box', true); const ui = $('#unitsIn'); if (ui) ui.focus(); return; }
+    it.units = u;
+  }
   const before = it.stock;
   if (m.mode === 'box') it.stock += n * it.units; else if (m.mode === 'piece') it.stock += n; else it.stock = n;
   await saveCatalog();
