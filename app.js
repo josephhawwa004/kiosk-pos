@@ -585,14 +585,17 @@ function itemsTab() {
       rows += `<tr class="${on ? '' : 'off'}">
         <td class="s"><div class="namecell"><div class="thumb"><img src="${esc(it.img)}" alt=""></div><div class="grow"><input class="nameinp" id="vname-${it.id}" value="${esc(its.length > 1 ? (it.ar || '') : g.ar)}" data-chg="${its.length > 1 ? 'vname' : 'gname'}" data-id="${its.length > 1 ? it.id : g.id}" aria-label="name"><small>${esc(its.length > 1 ? L(g.ar, g.en) : L(S.cats.find((x) => x.id === g.cat)?.ar, S.cats.find((x) => x.id === g.cat)?.en))}</small></div>
           <button class="btn sm" data-act="editItem" data-id="${it.id}" style="margin-inline-start:auto">${S.lang === 'ar' ? 'تعديل' : 'Edit'}</button></div></td>
-        <td><input class="ti num" id="box-${it.id}" inputmode="decimal" value="${jd(it.box)}" data-chg="box" data-id="${it.id}" aria-label="box price"></td>
+${isBarista(it) ? `<td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td><td class="num" style="color:var(--muted)">—</td>` : `        <td><input class="ti num" id="box-${it.id}" inputmode="decimal" value="${jd(it.box)}" data-chg="box" data-id="${it.id}" aria-label="box price"></td>
         <td><input class="ti u num ${it.units > 0 ? '' : 'need'}" id="units-${it.id}" inputmode="numeric" value="${it.units > 0 ? it.units : ''}" placeholder="؟" data-chg="units" data-id="${it.id}" aria-label="pieces per box"></td>
         <td><input class="ti num" id="cost-${it.id}" inputmode="decimal" value="${c == null ? '' : jd(c)}" placeholder="—" data-chg="cost" data-id="${it.id}" ${it.units > 0 ? '' : 'disabled'} aria-label="unit cost"></td>
+`}
         <td><input class="ti num ${it.sell > 0 ? '' : 'need'}" id="sell-${it.id}" inputmode="decimal" value="${it.sell > 0 ? jd(it.sell) : ''}" placeholder="؟" data-chg="sell" data-id="${it.id}" aria-label="selling price"></td>
-        <td class="num ${p == null ? '' : p >= 0 ? 'pos' : 'neg'}">${p == null ? '—' : jd(p)}</td>
-        <td><div class="stk"><div class="v"><span class="num ${stCls}">${st} ${S.lang === 'ar' ? 'حبة' : 'pcs'}</span><small>${esc(bx)}</small></div>
+${isBarista(it) ? `<td class="num" style="color:var(--muted)">—</td>` : `        <td class="num ${p == null ? '' : p >= 0 ? 'pos' : 'neg'}">${p == null ? '—' : jd(p)}</td>
+`}
+${isBarista(it) ? `<td class="num" style="color:var(--muted)">${S.lang === 'ar' ? 'مفتوح' : 'Always open'}</td>` : `        <td><div class="stk"><div class="v"><span class="num ${stCls}">${st} ${S.lang === 'ar' ? 'حبة' : 'pcs'}</span><small>${esc(bx)}</small></div>
           <div class="bs"><button class="btn sm" data-act="stock" data-mode="box" data-id="${it.id}" ${it.units > 0 ? '' : 'disabled'}>+ ${S.lang === 'ar' ? 'صندوق' : 'Box'}</button><button class="btn sm" data-act="stock" data-mode="piece" data-id="${it.id}">+ ${S.lang === 'ar' ? 'حبة' : 'Pcs'}</button></div>
           <button class="btn sm" data-act="stock" data-mode="set" data-id="${it.id}" title="جرد">${S.lang === 'ar' ? 'جرد' : 'Count'}</button></div></td>
+`}
         <td><button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" data-act="toggle" data-id="${it.id}"><i></i><span>${on ? 'ON' : 'OFF'}</span></button></td></tr>`;
     }
   }
