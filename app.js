@@ -318,9 +318,9 @@ const MERGES_V5 = [{"g": "super", "keep": "super-1", "ids": ["super-1", "super-2
 const MERGES_V7 = [{"g": "freez", "keep": "freez-1", "ids": ["freez-1", "freez-2", "freez-3", "freez-4", "freez-5"], "ar": null, "en": null, "img": "img/freez-mix.webp"}, {"g": "bansella", "keep": "bansella-1", "ids": ["bansella-1", "bansella-2"], "ar": null, "en": null, "img": "img/bansella-mix.webp"}, {"g": "rani", "keep": "rani-1", "ids": ["rani-1", "rani-2"], "ar": null, "en": null, "img": "img/rani-mix.webp"}, {"g": "tonic", "keep": "tonic-1", "ids": ["tonic-1", "tonic-2"], "ar": null, "en": null, "img": "img/tonic-mix.webp"}, {"g": "glass", "keep": "glass-1", "ids": ["glass-1", "glass-2", "glass-3"], "ar": null, "en": null, "img": "img/glass-mix.webp"}, {"g": "almaraiprotein", "keep": "almaraiprotein-1", "ids": ["almaraiprotein-1", "almaraiprotein-2", "almaraiprotein-3"], "ar": null, "en": null, "img": "img/almaraiprotein-mix.webp"}, {"g": "canary", "keep": "canary-1", "ids": ["canary-1", "canary-2", "canary-3", "canary-4"], "ar": null, "en": null, "img": "img/canary-mix.webp"}, {"g": "tasco", "keep": "tasco-1", "ids": ["tasco-1", "tasco-2"], "ar": null, "en": null, "img": "img/tasco-mix.webp"}, {"g": "mrbrown", "keep": "mrbrown-1", "ids": ["mrbrown-1", "mrbrown-2", "mrbrown-3", "mrbrown-4", "mrbrown-5"], "ar": null, "en": null, "img": "img/mrbrown-mix.webp"}, {"g": "icetea", "keep": "icetea-1", "ids": ["icetea-1", "icetea-2", "icetea-3", "icetea-4", "icetea-5", "icetea-6", "icetea-7", "icetea-8"], "ar": null, "en": null, "img": "img/icetea-mix.webp"}, {"g": "blu", "keep": "blu-1", "ids": ["blu-1", "blu-2", "blu-3", "blu-4"], "ar": null, "en": null, "img": "img/blu-mix.webp"}, {"g": "black", "keep": "black-1", "ids": ["black-1", "black-2"], "ar": null, "en": null, "img": "img/black-mix.webp"}, {"g": "landessa", "keep": "landessa-1", "ids": ["landessa-1", "landessa-2", "landessa-3", "landessa-4", "landessa-5"], "ar": null, "en": null, "img": "img/landessa-mix.webp"}];
 /* two admins; each one's password opens Admin, hospitality and the discount */
 const ADMINS = [{ id: 'anas', ar: 'أنس', en: 'Anas' }, { id: 'lawrence', ar: 'لورنس', en: 'Lawrence' }];
-const DISC_PCT = 30;
+const DISC_AMTS = [250, 500, 750, 1000, 1500]; /* fixed discounts in fils */
 const cartSub = () => S.cart.reduce((a, l) => a + l.price * l.qty, 0);
-const cartDisc = () => (S.disc && S.cart.length ? Math.round(cartSub() * S.disc.pct / 100) : 0);
+const cartDisc = () => (S.disc && S.cart.length ? Math.min(S.disc.amt, cartSub()) : 0);
 const cartTotal = () => cartSub() - cartDisc();
 const lineNet = (l) => (l.net != null ? l.net : l.price * l.qty);
 const adminName = (ar) => { const x = ADMINS.find((d) => d.ar === ar); return x ? L(x.ar, x.en) : ar; };
@@ -350,13 +350,13 @@ function cartHtml() {
     <div class="lines scroll">${lines}</div>
     <div class="cartfoot">
       ${S.disc ? `<div class="discrow"><span>${esc(t('sub'))}</span><span class="num">${jd(cartSub())}</span></div>
-      <div class="discrow d"><span>${esc(t('disc'))} ${S.disc.pct}% · ${esc(adminName(S.disc.by))}</span><span class="num">-${jd(cartDisc())}</span><button class="xbtn" data-act="rmDisc" aria-label="remove discount">${ICON.x}</button></div>` : ''}
+      <div class="discrow d"><span>${esc(t('disc'))} · ${esc(adminName(S.disc.by))}</span><span class="num">-${jd(cartDisc())}</span><button class="xbtn" data-act="rmDisc" aria-label="remove discount">${ICON.x}</button></div>` : ''}
       ${!empty && S.cashPart ? `<div class="discrow"><span>${esc(t('total'))}</span><span class="num">${jd(total)}</span></div>
       <div class="discrow d"><span>${A2() ? 'دفع كاش' : 'Paid cash'}</span><span class="num">-${jd(S.cashPart)}</span></div>
       <div class="total"><span>${A2() ? 'الباقي عليه' : 'Still to pay'}</span><b class="num">${jd(total - S.cashPart)} <small>${esc(t('jd'))}</small></b></div>` : `<div class="total"><span>${esc(t('total'))}</span><b class="num">${jd(total)} <small>${esc(t('jd'))}</small></b></div>`}
       <div class="seg seg3" role="group">${pays}</div>${cash}
       <div class="actions"><button class="btn hosp" data-act="hosp" ${empty ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('hosp'))}</span></button>
-        <button class="btn hosp disc ${S.disc ? 'on' : ''}" data-act="disc" ${empty || S.disc ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('disc'))} <span class="num">${DISC_PCT}%</span></span></button>
+        <button class="btn hosp disc ${S.disc ? 'on' : ''}" data-act="disc" ${empty || S.disc ? 'disabled' : ''}>${ICON.lock}<span>${esc(t('disc'))}</span></button>
         <button class="btn primary big" data-act="checkout" ${empty ? 'disabled' : ''}>${esc(t('checkout'))}</button></div>
     </div></div>`;
 }
@@ -405,6 +405,15 @@ function playCash(force) {
   } catch (e) { /* ignore */ }
 }
 document.addEventListener('pointerdown', () => { if (SND.ctx && SND.ctx.state === 'suspended') SND.ctx.resume(); }, true);
+
+/* ---------- fixed discount amounts, chosen after the admin password ---------- */
+function openDiscPick(who) {
+  S.discWho = who; S.modal = { kind: 'disc' };
+  const A = A2(), sub = cartSub();
+  openModal(`<div class="modal narrow" role="dialog" aria-label="${esc(t('disc'))}">
+    <div class="mhead"><div class="grow"><b>${esc(t('disc'))}</b><small>${esc(t('total'))}: <span class="num">${jd(sub)}</span> ${esc(t('jd'))} · ${esc(adminName(who))}</small></div><button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
+    <div class="mbody"><div class="discpick">${DISC_AMTS.map((v) => `<button class="segbtn" data-act="discAmt" data-v="${v}" ${v > sub ? 'disabled' : ''}><b class="num">-${jd(v)}</b><small>${A ? 'د.أ' : 'JD'}</small></button>`).join('')}</div></div></div>`);
+}
 
 /* ---------- cash keypad: exact, more (change back) or part (rest by visa / cliq) ---------- */
 function openCashPad() { S.modal = { kind: 'cash', val: '' }; drawCashPad(); }
@@ -475,7 +484,7 @@ async function saveSale(type, who) {
   const now = Date.now();
   const lines = S.cart.map((l) => { const it = S.items[l.id]; const c = unitCost(it); return { id: l.id, name: itemName(it), nameAr: (() => { const g = groupOf(it); return it.ar ? `${g.ar} - ${it.ar}` : g.ar; })(), qty: l.qty, price: l.price, cost: c == null ? null : Math.round(c * 1000) / 1000 }; });
   const sub = lines.reduce((a, l) => a + l.price * l.qty, 0);
-  const disc = type === 'sale' && S.disc ? Math.round(sub * S.disc.pct / 100) : 0;
+  const disc = type === 'sale' && S.disc ? Math.min(S.disc.amt, sub) : 0;
   if (disc) { /* spread the discount over the lines so item reports add up to the real total */
     let left = sub - disc;
     lines.forEach((l, i) => { l.net = i === lines.length - 1 ? left : Math.round(l.price * l.qty * (sub - disc) / sub); left -= i === lines.length - 1 ? 0 : l.net; });
@@ -483,7 +492,7 @@ async function saveSale(type, who) {
   const total = sub - disc;
   const cost = lines.reduce((a, l) => a + (l.cost || 0) * l.qty, 0);
   const sale = { id: now.toString(36) + '-' + Math.random().toString(36).slice(2, 6), ts: now, day: dayOf(new Date(now)), no: S.dayCount + 1, type, pay: type === 'sale' ? S.pay : null, given: type === 'sale' && S.pay === 'cash' ? S.given : null, lines, total, cost, voided: false, syncedFlag: 0 };
-  if (disc) Object.assign(sale, { sub, disc, discPct: S.disc.pct, by: S.disc.by });
+  if (disc) Object.assign(sale, { sub, disc, discAmt: disc, by: S.disc.by });
   if (type === 'hosp' && who) sale.by = who;
   if (type === 'sale' && S.cashPart) {
     if (S.pay === 'cash' || S.cashPart >= total) { toast(A2() ? 'اختار فيزا أو كليك للمبلغ الباقي' : 'Pick Visa or CliQ for the rest', true); return; }
@@ -777,7 +786,7 @@ function reportTab(kind) {
       <tbody>${rows || `<tr><td colspan="5" style="height:80px;color:var(--muted)">${A ? 'ما في ضيافة' : 'None'}</td></tr>`}<tr><td></td><td class="s"><b>${A ? 'المجموع' : 'Total'}</b></td><td></td><td class="num neg">-${jd(ag.hospSell)}</td><td class="num">${jd(ag.hospCost)}</td></tr></tbody></table></div>`;
   }
   const rows = adminCache.sales.map((s) => `<tr class="${s.voided ? 'voided' : ''}"><td class="num">#${s.no}</td><td class="num">${s.day} ${timeOf(s.ts)}</td><td class="s">${esc(s.lines.map((l) => `${l.name} ×${l.qty}`).join('، '))}</td>
-    <td>${s.type === 'hosp' ? `<span class="tag h">${esc(t('hosp'))}${s.by ? ' · ' + esc(adminName(s.by)) : ''}</span>` : `<span class="tag">${esc(s.split ? t('split') + ': ' + splitText(s.split, A) : t(s.pay))}</span>`}${s.disc ? ` <span class="tag d">${esc(t('disc'))} ${s.discPct}% · ${esc(adminName(s.by))}</span>` : ''}</td><td class="num ${s.type === 'hosp' ? 'neg' : ''}">${s.type === 'hosp' ? '-' : ''}${jd(s.total)}</td>
+    <td>${s.type === 'hosp' ? `<span class="tag h">${esc(t('hosp'))}${s.by ? ' · ' + esc(adminName(s.by)) : ''}</span>` : `<span class="tag">${esc(s.split ? t('split') + ': ' + splitText(s.split, A) : t(s.pay))}</span>`}${s.disc ? ` <span class="tag d">${esc(t('disc'))} ${s.discPct ? s.discPct + '%' : jd(s.disc)} · ${esc(adminName(s.by))}</span>` : ''}</td><td class="num ${s.type === 'hosp' ? 'neg' : ''}">${s.type === 'hosp' ? '-' : ''}${jd(s.total)}</td>
     <td>${s.voided ? (A ? 'ملغي' : 'Void') : `<button class="btn sm danger" data-act="void" data-id="${s.id}">${A ? 'إلغاء' : 'Void'}</button>`}</td></tr>`).join('');
   return `<div class="ahead"><div><h1>${esc(t('tSales'))}</h1><p>${A ? 'إلغاء أي طلب بيرجّع الكمية للمخزون وبيشيله من الحسابات' : 'Voiding returns the stock and removes it from totals'}</p></div><div class="actions">${exportBtns}</div></div>
     <div class="toolbar">${dateBar()}</div>
@@ -924,7 +933,7 @@ function forSheet(s) {
     return parts.map((p) => { const f = s.split[p] / s.total; return Object.assign({}, base, { pay: p, total: s.split[p], lines: base.lines.map((l) => Object.assign({}, l, { nameAr: (l.nameAr || l.name) + ' (مقسوم)', price: l.price * f, cost: l.cost == null ? null : l.cost * f })) }); });
   }
   if (!s.disc && !s.by) return s;
-  const tag = s.disc ? ` (خصم ${s.discPct}% · ${s.by})` : ` (${s.by})`;
+  const tag = s.disc ? ` (خصم ${s.discPct ? s.discPct + '%' : jd(s.disc)} · ${s.by})` : ` (${s.by})`;
   return Object.assign({}, s, { lines: s.lines.map((l) => Object.assign({}, l, { nameAr: (l.nameAr || l.name) + tag, price: s.disc ? lineNet(l) / l.qty : l.price })) });
 }
 /* tablet keyboards add capitals, Arabic digits or spaces: the secret is always plain lowercase */
@@ -1097,7 +1106,8 @@ document.addEventListener('click', async (e) => {
       if (S.cashPart && S.pay === 'cash') { toast(A2() ? 'اختار فيزا أو كليك للمبلغ الباقي' : 'Pick Visa or CliQ for the rest', true); break; }
       saveSale('sale'); break;
     case 'hosp': askPin(t('pinHosp'), (who) => saveSale('hosp', who)); break;
-    case 'disc': if (S.cart.length && !S.disc) askPin(t('pinDisc'), (who) => { S.disc = { pct: DISC_PCT, by: who }; S.given = null; S.cashPart = null; rerenderCart(); }); break;
+    case 'disc': if (S.cart.length && !S.disc) askPin(t('pinDisc'), (who) => openDiscPick(who)); break;
+    case 'discAmt': { const v = +el.dataset.v; closeModal(); S.disc = { amt: v, by: S.discWho }; S.given = null; S.cashPart = null; rerenderCart(); break; }
     case 'rmDisc': S.disc = null; S.given = null; S.cashPart = null; rerenderCart(); break;
     case 'pin': pinKey(el.dataset.k); break;
     case 'theme': S.settings.theme = S.settings.theme === 'dark' ? 'light' : 'dark'; saveSettings(); render(); if (S.admin.tab === 'settings' && S.view === 'admin') fillStorageInfo(); break;
