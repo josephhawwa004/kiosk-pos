@@ -165,6 +165,9 @@ async function loadAll() {
     const g = cat.groups.find((x) => x.id === 'vidal'); if (g && g.ar === 'سوس فيدال') { g.ar = 'سوس جوجو وفيدال'; g.en = 'Jojo & Vidal Candy'; }
     if (!Object.values(cat.items).some((i) => i.groupId === 'jojo')) cat.groups = cat.groups.filter((x) => x.id !== 'jojo');
   }
+  if (cat.seedVersion < 17) { /* v17: Barista section first, above Water */
+    if (!cat.cats.some((c) => c.id === 'barista')) cat.cats.unshift({ id: 'barista', ar: 'باريستا', en: 'Barista' });
+  }
   if (cat.seedVersion < SEED.version) { /* v3+: add new items and flavours; never touch prices, stock or names already set */
     const fresh = seedCatalog();
     fresh.groups.forEach((g) => {
@@ -263,10 +266,12 @@ function header() {
 /* ---------- sell view ---------- */
 function visibleGroups() {
   const q = S.q.trim();
-  return S.groups.filter((g) => (S.cat === 'all' || g.cat === S.cat) && itemsOf(g.id).length && groupMatches(g, q)).sort((a, b) => a.order - b.order);
+  /* typing in search looks through every section */
+  return S.groups.filter((g) => (q || S.cat === 'all' || g.cat === S.cat) && itemsOf(g.id).length && groupMatches(g, q)).sort((a, b) => a.order - b.order);
 }
 function sellView() {
-  const cats = [{ id: 'all', ar: t('all'), en: t('all') }, ...S.cats];
+  if (!S.cats.some((c) => c.id === S.cat)) S.cat = (S.cats[0] || {}).id || 'all';
+  const cats = S.cats;
   const nav = cats.map((c) => {
     const n = c.id === 'all' ? S.groups.length : S.groups.filter((g) => g.cat === c.id).length;
     return `<button class="sidebtn ${S.cat === c.id ? 'on' : ''}" data-act="cat" data-id="${c.id}" aria-pressed="${S.cat === c.id}"><b>${esc(L(c.ar, c.en))}</b><small>${esc(t('items', n))}</small></button>`;
@@ -284,9 +289,9 @@ function sellView() {
 }
 function gridHtml() {
   const gs = visibleGroups();
-  const title = S.q.trim() ? t('results') : L(...(S.cat === 'all' ? [t('all'), t('all')] : (() => { const c = S.cats.find((x) => x.id === S.cat); return [c.ar, c.en]; })()));
+  const title = S.q.trim() ? t('results') : L(...(!S.cats.some((c) => c.id === S.cat) ? [t('all'), t('all')] : (() => { const c = S.cats.find((x) => x.id === S.cat); return [c.ar, c.en]; })()));
   const head = `<div class="gridhead"><b>${esc(title)}</b><span>${esc(t('items', gs.length))}</span></div>`;
-  if (!gs.length) return head + `<div class="empty"><b>${esc(t('noResults'))}</b></div>`;
+  if (!gs.length) return head + `<div class="empty"><b>${esc(S.q.trim() ? t('noResults') : (S.lang === 'ar' ? 'لسا ما في أصناف بهاد القسم' : 'No items in this section yet'))}</b></div>`;
   const tiles = gs.map((g) => {
     const its = itemsOf(g.id), avail = its.filter(isAvail), multi = its.length > 1;
     const prices = (avail.length ? avail : its).map((i) => i.sell).filter((p) => p > 0);
