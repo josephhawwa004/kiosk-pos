@@ -426,3 +426,9 @@ html[data-theme=dark] .exact{background:var(--card);border-color:#EDEDEF;color:#
 html[data-theme=dark] .cpshow{border-color:#EDEDEF}
 html[data-theme=dark] .cpnote{background:#2E1C12}
 html[data-theme=dark] .cpnote.ok{background:#12301C;color:#7EE2A0;border-color:#1E5A32}
+/* many choices (barista menu): 4 per row, smaller pictures, all fit without scrolling */
+.vgrid.dense{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.vgrid.dense .vbtn{min-height:0;padding:8px 6px;gap:4px}
+.vgrid.dense .vbtn img{width:44px;height:44px}
+.vgrid.dense .vbtn b{font-size:15px;line-height:1.25}
+.vgrid.dense .vbtn .pr{height:26px;font-size:14px}

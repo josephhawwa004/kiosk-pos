@@ -110,7 +110,7 @@ function seedCatalog() {
   SEED.groups.forEach((g, gi) => {
     groups.push({ id: g.id, ar: g.ar, en: g.en, cat: g.cat, order: gi });
     g.variants.forEach((v, vi) => {
-      items[v.id] = { id: v.id, groupId: g.id, ar: v.ar, en: v.en, img: v.img, box: v.boxPrice == null ? null : Math.round(v.boxPrice * 1000), units: v.units, sell: null, stock: 0, off: false, sku: v.sku, order: vi };
+      items[v.id] = { id: v.id, groupId: g.id, ar: v.ar, en: v.en, img: v.img, box: v.boxPrice == null ? null : Math.round(v.boxPrice * 1000), units: v.units, sell: v.sell == null ? null : Math.round(v.sell * 1000), stock: 0, off: false, sku: v.sku, order: vi };
     });
   });
   return { cats: SEED.cats, groups, items, seedVersion: SEED.version };
@@ -181,6 +181,11 @@ async function loadAll() {
     });
     cat.seedVersion = SEED.version; await DB.set('catalog', cat);
   }
+  /* a menu price from the app fills any item that has no price yet (never overwrites one you set) */
+  let filled = false;
+  SEED.groups.forEach((g) => g.variants.forEach((v) => { const it = cat.items[v.id]; if (it && v.sell != null && !(it.sell > 0)) { it.sell = Math.round(v.sell * 1000); filled = true; } }));
+  SEED.groups.forEach((g) => { const have = cat.groups.find((x) => x.id === g.id); if (have && have.cat !== g.cat && g.cat === 'barista') { have.cat = g.cat; filled = true; } });
+  if (filled) await DB.set('catalog', cat);
   S.cats = cat.cats; S.groups = cat.groups; S.items = cat.items;
   S.settings = (await DB.get('settings')) || {};
   if (!S.settings.pin) { S.settings.pin = await sha('1234'); S.settings.lang = 'ar'; await DB.set('settings', S.settings); }
@@ -379,7 +384,7 @@ function flavorSheet(gid) {
   openModal(`<div class="modal" role="dialog" aria-label="${esc(L(g.ar, g.en))}">
     <div class="mhead"><div class="mimg"><img src="${esc(its[0].img)}" alt=""></div><div class="grow"><b>${esc(L(g.ar, g.en))}</b><small>${esc(t('pickFlavor'))}</small></div>
       <button class="close" data-act="closeModal" aria-label="close">${ICON.x}</button></div>
-    <div class="mbody scroll"><div class="vgrid">${btns}</div></div></div>`);
+    <div class="mbody scroll"><div class="vgrid ${its.length > 6 ? 'dense' : ''}">${btns}</div></div></div>`);
 }
 
 /* ---------- checkout sound (stored with the app, so it plays offline) ---------- */
